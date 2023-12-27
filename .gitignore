@@ -6,8 +6,7 @@ negative_prompts/
 __pycache__/
 _example_cursor.py
 pyinstaller.txt
-no_image.clip
-icon.clip
 build/
 dist/
 *.spec
+ART_WORK/
