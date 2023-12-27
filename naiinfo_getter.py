@@ -42,7 +42,7 @@ def _get_naidict_from_exifdict(exif_dict):
     try:
         nai_dict = {}
         nai_dict["prompt"] = exif_dict["prompt"].strip()
-        nai_dict["negative_prompt"] = exif_dict["uc"].strip()
+        nai_dict["negative_prompt"] = exif_dict["uc"].strip() if "uc" in exif_dict else exif_dict["negative_prompt"].strip()
 
         option_dict = {}
         for key in TARGETKEY_NAIDICT_OPTION:
@@ -69,9 +69,26 @@ def get_naidict_from_file(src):
         img.load()
     except Exception as e:
         print(e)
-        return None, 0
+        return None
 
     return get_naidict_from_img(img)
+
+
+def get_naidict_from_txt(src):
+    try:
+        with open(src, "r", encoding="utf8") as f:
+            info_str = f.read()
+        ed = json.loads(info_str)
+    except Exception as e:
+        print(e)
+        return info_str or "", 0
+
+    nd = _get_naidict_from_exifdict(ed)
+    if not nd:
+        return ed, 1
+
+    if nd:
+        return nd, 3
 
 
 def get_naidict_from_img(img):
@@ -96,9 +113,9 @@ def get_naidict_from_img(img):
 
 
 if __name__ == "__main__":
-    src = "target.webp"
+    src = "settings/aris_noimage.txt"
 
-    nd = get_naidict_from_file(src)
+    nd = get_naidict_from_txt(src)
     print(nd)
     # exif_dict = get_exifdict_from_infostr(info_str)
     # nai_dict = get_naidict_from_exifdict(exif_dict)

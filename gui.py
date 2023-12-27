@@ -14,7 +14,7 @@ from urllib import request
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
 from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer
 from gui_init import init_main_widget
-from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, TextSaveDialog, TextLoadDialog, LoginThread
+from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, TextSaveDialog, TextLoadDialog
 
 from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING
 
@@ -227,6 +227,85 @@ class MyWidget(QMainWindow):
 
         return data
 
+    def _get_data_for_generate(self):
+        data = self.get_data(True)
+
+        # data precheck
+        data["prompt"] = self.apply_wildcards(data["prompt"])
+        data["negative_prompt"] = self.apply_wildcards(data["negative_prompt"])
+
+        if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
+            data["seed"] = random.randint(0, 9999999999)
+            self.dict_ui_settings["seed"].setText(str(data["seed"]))
+
+        self.last_parameter = data
+
+        return data
+
+    def on_click_generate_once(self):
+        self.nai.set_param_dict(self._get_data_for_generate())
+
+        generate_thread = GenerateThread(self)
+        generate_thread.generate_result.connect(self._on_result_generate)
+        generate_thread.start()
+
+        self.set_statusbar_text("GENEARTING")
+        self.set_disable_button(True)
+        self.generate_thread = generate_thread
+
+    def _on_result_generate(self, error_code, result):
+        self.generate_thread = None
+        self.set_disable_button(False)
+        self.set_statusbar_text("IDLE")
+        self.refresh_anlas()
+
+        if error_code == 0:
+            self.image_result.set_custom_pixmap(result)
+        else:
+            QMessageBox.information(
+                self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
+
+    def on_click_generate_auto(self):
+        if not self.autogenerate_thread:
+            d = GenerateDialog(self)
+            if d.exec_() == QDialog.Accepted:
+                autogenerate_thread = AutoGenerateThread(
+                    self, d.count, d.delay)
+                autogenerate_thread.autogenerate_error.connect(
+                    self._on_error_autogenerate)
+                autogenerate_thread.autogenerate_end.connect(
+                    self._on_end_autogenerate)
+                autogenerate_thread.start()
+
+                self.set_autogenerate_mode(True)
+                self.autogenerate_thread = autogenerate_thread
+        else:
+            self.autogenerate_thread.stop()
+            self._on_end_autogenerate()
+
+    def _on_error_autogenerate(self, error_code, result):
+        QMessageBox.information(
+            self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
+        self._on_end_autogenerate()
+
+    def _on_end_autogenerate(self):
+        self.autogenerate_thread = None
+        self.set_autogenerate_mode(False)
+        self.set_statusbar_text("IDLE")
+        self.refresh_anlas()
+
+    def set_autogenerate_mode(self, is_autogenrate):
+        self.button_generate_once.setDisabled(is_autogenrate)
+
+        stylesheet = """
+            color:black;
+            background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
+        """ if is_autogenrate else ""
+        self.button_generate_auto.setStyleSheet(stylesheet)
+        self.button_generate_auto.setText(
+            "생성 중지" if is_autogenrate else "연속 생성")
+        self.button_generate_auto.setDisabled(False)
+
     def apply_wildcards(self, prompt):
         self.check_folders()
 
@@ -389,6 +468,11 @@ class MyWidget(QMainWindow):
 
         self._get_image_info_byinfo(nai_dict, error_code, file_src)
 
+    def get_image_info_bytxt(self, file_src):
+        nai_dict, error_code = naiinfo_getter.get_naidict_from_txt(file_src)
+
+        self._get_image_info_byinfo(nai_dict, error_code, None)
+
     def get_image_info_byimg(self, img):
         nai_dict, error_code = naiinfo_getter.get_naidict_from_img(img)
 
@@ -409,17 +493,9 @@ class MyWidget(QMainWindow):
             new_dict.update(nai_dict["etc"])
 
             self.set_data(new_dict)
-            self.image_result.set_custom_pixmap(img_obj)
+            if img_obj:
+                self.image_result.set_custom_pixmap(img_obj)
             self.set_statusbar_text("LOAD_COMPLETE")
-
-    def show_file_dialog(self):
-        select_dialog = QFileDialog()
-        select_dialog.setFileMode(QFileDialog.ExistingFile)
-        fname = select_dialog.getOpenFileNames(
-            self, 'Open image file to get nai exif data', '', 'Image File(*.png *.webp)')
-
-        if fname[0]:
-            self.get_image_info_bysrc(fname[0][0])
 
     def show_login_dialog(self):
         LoginDialog(self)
@@ -478,6 +554,23 @@ class MyWidget(QMainWindow):
 
         self.set_auto_login(False)
 
+    def show_file_dialog(self):
+        select_dialog = QFileDialog()
+        select_dialog.setFileMode(QFileDialog.ExistingFile)
+        fname = select_dialog.getOpenFileName(
+            self, 'Open image file or txt file to get nai data', '', 'Image File, Text File(*.txt *.png *.webp)')
+
+        if fname[0]:
+            fname = fname[0]
+            if fname.endswith(".png") or fname.endswith(".webp"):
+                self.get_image_info_bysrc(fname)
+            elif fname.endswith(".txt"):
+                self.get_image_info_bytxt(fname)
+            else:
+                QMessageBox.information(
+                    self, '경고', "png, webp, txt 파일만 가능합니다.")
+                return
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
@@ -494,10 +587,14 @@ class MyWidget(QMainWindow):
         furl = files[0]
         if furl.isLocalFile():
             fname = furl.toLocalFile()
-            if not fname.endswith(".png") and not fname.endswith(".webp"):
-                QMessageBox.information(self, '경고', "png, webp 파일만 가능합니다.")
+            if fname.endswith(".png") or fname.endswith(".webp"):
+                self.get_image_info_bysrc(fname)
+            elif fname.endswith(".txt"):
+                self.get_image_info_bytxt(fname)
+            else:
+                QMessageBox.information(
+                    self, '경고', "png, webp, txt 파일만 가능합니다.")
                 return
-            self.get_image_info_bysrc(fname)
         else:
             self.set_statusbar_text("LOADING")
             url = furl.url()
@@ -540,88 +637,6 @@ class MyWidget(QMainWindow):
         self.close()
         self.app.closeAllWindows()
         QCoreApplication.exit(0)
-
-#################################################
-# debug for under <-this gonna refectory
-
-    def _get_data_for_generate(self):
-        data = self.get_data(True)
-
-        # data precheck
-        data["prompt"] = self.apply_wildcards(data["prompt"])
-        data["negative_prompt"] = self.apply_wildcards(data["negative_prompt"])
-
-        if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
-            data["seed"] = random.randint(0, 9999999999)
-            self.dict_ui_settings["seed"].setText(str(data["seed"]))
-
-        self.last_parameter = data
-
-        return data
-
-    def on_click_generate_once(self):
-        self.nai.set_param_dict(self._get_data_for_generate())
-
-        generate_thread = GenerateThread(self)
-        generate_thread.generate_result.connect(self._on_result_generate)
-        generate_thread.start()
-
-        self.set_statusbar_text("GENEARTING")
-        self.set_disable_button(True)
-        self.generate_thread = generate_thread
-
-    def _on_result_generate(self, error_code, result):
-        self.generate_thread = None
-        self.set_disable_button(False)
-        self.set_statusbar_text("IDLE")
-        self.refresh_anlas()
-
-        if error_code == 0:
-            self.image_result.set_custom_pixmap(result)
-        else:
-            QMessageBox.information(
-                self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
-
-    def on_click_generate_auto(self):
-        if not self.autogenerate_thread:
-            d = GenerateDialog(self)
-            if d.exec_() == QDialog.Accepted:
-                autogenerate_thread = AutoGenerateThread(
-                    self, d.count, d.delay)
-                autogenerate_thread.autogenerate_error.connect(
-                    self._on_error_autogenerate)
-                autogenerate_thread.autogenerate_end.connect(
-                    self._on_end_autogenerate)
-                autogenerate_thread.start()
-
-                self.set_autogenerate_mode(True)
-                self.autogenerate_thread = autogenerate_thread
-        else:
-            self.autogenerate_thread.stop()
-            self._on_end_autogenerate()
-
-    def _on_error_autogenerate(self, error_code, result):
-        QMessageBox.information(
-            self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
-        self._on_end_autogenerate()
-
-    def _on_end_autogenerate(self):
-        self.autogenerate_thread = None
-        self.set_autogenerate_mode(False)
-        self.set_statusbar_text("IDLE")
-        self.refresh_anlas()
-
-    def set_autogenerate_mode(self, is_autogenrate):
-        self.button_generate_once.setDisabled(is_autogenrate)
-
-        stylesheet = """
-            color:black;
-            background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
-        """ if is_autogenrate else ""
-        self.button_generate_auto.setStyleSheet(stylesheet)
-        self.button_generate_auto.setText(
-            "생성 중지" if is_autogenrate else "연속 생성")
-        self.button_generate_auto.setDisabled(False)
 
 
 class AutoGenerateThread(QThread):
