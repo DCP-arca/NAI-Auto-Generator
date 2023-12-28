@@ -238,8 +238,6 @@ class MyWidget(QMainWindow):
             data["seed"] = random.randint(0, 9999999999)
             self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
-        self.last_parameter = data
-
         return data
 
     def on_click_generate_once(self):
@@ -441,7 +439,8 @@ class MyWidget(QMainWindow):
         create_folder_if_not_exists(path)
 
         if code == "path_wildcards":
-            self.wcapplier = WildcardApplier(self.settings.value("path_wildcards", DEFAULT_PATH["path_wildcards"]))
+            self.wcapplier = WildcardApplier(self.settings.value(
+                "path_wildcards", DEFAULT_PATH["path_wildcards"]))
 
     def on_click_expand(self):
         if self.is_expand:
@@ -669,7 +668,8 @@ class AutoGenerateThread(QThread):
 
             # generate data
             if not temp_preserve_data_once:
-                parent.nai.set_param_dict(parent._get_data_for_generate())
+                data = parent._get_data_for_generate()
+                parent.nai.set_param_dict(data)
             temp_preserve_data_once = False
 
             # set status bar
@@ -688,6 +688,8 @@ class AutoGenerateThread(QThread):
                 parent._on_refresh_anlas(parent.nai.get_anlas() or -1)
 
                 parent.image_result.set_custom_pixmap(result_str)
+
+                parent.last_parameter = data
             else:
                 if self.ignore_error:
                     for t in range(5, 0, -1):
