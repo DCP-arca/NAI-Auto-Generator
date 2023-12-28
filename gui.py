@@ -600,7 +600,6 @@ class MyWidget(QMainWindow):
             try:
                 url = furl.url()
                 res = request.urlopen(url).read()
-                print(res)
                 img = Image.open(BytesIO(res))
                 if img:
                     self.get_image_info_byimg(img)

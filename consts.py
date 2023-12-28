@@ -52,11 +52,13 @@ class S:
     }
 
     ABOUT = """
-    본진 : 아카라이브 AI그림 채널 https://arca.live/b/aiart
-    만든이 : https://arca.live/b/aiart @DCP
-    크레딧 :
-    https://huggingface.co/baqu2213
-    https://github.com/neggles/sd-webui-stealth-pnginfo/
+본진 : 
+  아카라이브 AI그림 채널 https://arca.live/b/aiart
+만든이 : 
+  https://arca.live/b/aiart @DCP
+크레딧 :
+  https://huggingface.co/baqu2213
+  https://github.com/neggles/sd-webui-stealth-pnginfo/
     """
 
     LABEL_PROMPT = "프롬프트(Prompt)"
