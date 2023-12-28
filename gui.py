@@ -440,6 +440,9 @@ class MyWidget(QMainWindow):
 
         create_folder_if_not_exists(path)
 
+        if code == "path_wildcards":
+            self.wcapplier = WildcardApplier(self.settings.value("path_wildcards", DEFAULT_PATH["path_wildcards"]))
+
     def on_click_expand(self):
         if self.is_expand:
             self.is_expand = False
