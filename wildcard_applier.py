@@ -54,7 +54,7 @@ class WildcardApplier():
 
             if str_center in self._wildcards_dict and not (str_center in except_list):
                 wc_list = self._wildcards_dict[str_center]
-                str_center = wc_list[random.randrange(0, len(wc_list))]
+                str_center = wc_list[random.randrange(0, len(wc_list))].strip()
 
                 applied_wildcard_list.append(str_center)
             else:
