@@ -47,6 +47,7 @@ class S:
         "LOAD_COMPLETE": "불러오기 완료",
         "AUTO_GENERATING_COUNT": "자동생성 중... 총 {}장 중 {}번째",
         "AUTO_GENERATING_INF": "자동생성 중...",
+        "AUTO_ERROR_WAIT": "생성 중 에러가 발생. {}초 뒤 다시 시작.",
         "AUTO_WAIT": "자동생성 딜레이를 기다리는 중... {}초"
     }
 

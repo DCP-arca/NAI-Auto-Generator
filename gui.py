@@ -270,7 +270,7 @@ class MyWidget(QMainWindow):
             d = GenerateDialog(self)
             if d.exec_() == QDialog.Accepted:
                 autogenerate_thread = AutoGenerateThread(
-                    self, d.count, d.delay)
+                    self, d.count, d.delay, d.ignore_error)
                 autogenerate_thread.autogenerate_error.connect(
                     self._on_error_autogenerate)
                 autogenerate_thread.autogenerate_end.connect(
@@ -597,14 +597,19 @@ class MyWidget(QMainWindow):
                 return
         else:
             self.set_statusbar_text("LOADING")
-            url = furl.url()
-            res = request.urlopen(url).read()
-            img = Image.open(BytesIO(res))
-            if not img:
+            try:
+                url = furl.url()
+                res = request.urlopen(url).read()
+                print(res)
+                img = Image.open(BytesIO(res))
+                if img:
+                    self.get_image_info_byimg(img)
+
+            except Exception as e:
+                print(e)
                 self.set_statusbar_text("IDLE")
                 QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")
                 return
-            self.get_image_info_byimg(img)
 
     def set_statusbar_text(self, status_key="", list_format=[]):
         statusbar = self.statusBar()
@@ -643,10 +648,11 @@ class AutoGenerateThread(QThread):
     autogenerate_error = pyqtSignal(int, str)
     autogenerate_end = pyqtSignal()
 
-    def __init__(self, parent, count, delay):
+    def __init__(self, parent, count, delay, ignore_error):
         super(AutoGenerateThread, self).__init__(parent)
         self.count = int(count or -1)
         self.delay = float(delay or 0.01)
+        self.ignore_error = ignore_error
         self.is_dead = False
 
     def run(self):
@@ -655,15 +661,23 @@ class AutoGenerateThread(QThread):
         count = self.count
         delay = float(self.delay)
 
+        temp_preserve_data_once = False
         while count != 0:
-            parent.nai.set_param_dict(parent._get_data_for_generate())
+            # 1. Generate
 
+            # generate data
+            if not temp_preserve_data_once:
+                parent.nai.set_param_dict(parent._get_data_for_generate())
+            temp_preserve_data_once = False
+
+            # set status bar
             if count <= -1:
                 parent.set_statusbar_text("AUTO_GENERATING_INF")
             else:
                 parent.set_statusbar_text("AUTO_GENERATING_COUNT", [
                     self.count, self.count - count + 1])
 
+            # generate image
             error_code, result_str = _threadfunc_generate_image(self)
             if self.is_dead:
                 return
@@ -673,19 +687,29 @@ class AutoGenerateThread(QThread):
 
                 parent.image_result.set_custom_pixmap(result_str)
             else:
-                self.autogenerate_error.emit(error_code, result_str)
-                return
+                if self.ignore_error:
+                    for t in range(5, 0, -1):
+                        parent.set_statusbar_text("AUTO_ERROR_WAIT", [t])
+                        time.sleep(1)
+                        if self.is_dead:
+                            return
 
+                    temp_preserve_data_once = True
+                    continue
+                else:
+                    self.autogenerate_error.emit(error_code, result_str)
+                    return
+
+            # 2. Wait
             count -= 1
             if count != 0:
-                # wait until delay
                 temp_delay = delay
                 for x in range(int(delay)):
                     parent.set_statusbar_text("AUTO_WAIT", [temp_delay])
                     time.sleep(1)
+                    if self.is_dead:
+                        return
                     temp_delay -= 1
-
-            count -= 1
 
         self.autogenerate_end.emit()
 

@@ -306,6 +306,11 @@ class GenerateDialog(QDialog):
         self.lineedit_delay = lineedit_delay
         layout_delay.addWidget(lineedit_delay, 1)
 
+        checkbox_ignoreerror = QCheckBox("에러 발생 시에도 계속 하기")
+        checkbox_ignoreerror.setChecked(True)
+        self.checkbox_ignoreerror = checkbox_ignoreerror
+        layout.addWidget(checkbox_ignoreerror, 1)
+
         layout_buttons = QHBoxLayout()
         layout.addLayout(layout_buttons)
 
@@ -322,6 +327,7 @@ class GenerateDialog(QDialog):
     def on_start_button_clicked(self):
         self.count = self.lineedit_count.text()
         self.delay = self.lineedit_delay.text()
+        self.ignore_error = self.checkbox_ignoreerror.isChecked()
         self.accept()
 
     def on_close_button_clicked(self):
