@@ -58,6 +58,33 @@ def strtobool(val):
         raise ValueError("invalid truth value %r" % (val,))
 
 
+def pickedit_lessthan_str(s):
+    edited_str = s
+    pos_prev = 0
+    while True:
+        pos_r = edited_str.find(">", pos_prev + 1)
+        if pos_r == -1:
+            break
+
+        pos_l = edited_str.rfind("<", pos_prev, pos_r)
+        if pos_l != -1:
+            left = edited_str[0:pos_l]
+            center = edited_str[pos_l + 1:pos_r]
+            right = edited_str[pos_r + 1:len(edited_str)]
+
+            center_splited = center.split("|")
+            center_picked = center_splited[random.randrange(
+                0, len(center_splited))]
+
+            result_left = left + center_picked
+            pos_prev = len(result_left) + 1
+            edited_str = result_left + right
+        else:
+            pos_prev = pos_r
+
+    return edited_str
+
+
 class MyWidget(QMainWindow):
 
     def __init__(self, app):
@@ -231,14 +258,25 @@ class MyWidget(QMainWindow):
         data = self.get_data(True)
 
         # data precheck
-        data["prompt"] = self.apply_wildcards(data["prompt"])
-        data["negative_prompt"] = self.apply_wildcards(data["negative_prompt"])
+        data["prompt"], data["negative_prompt"] = self._preedit_prompt(
+            data["prompt"], data["negative_prompt"])
 
+        # seed pick
         if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
             data["seed"] = random.randint(0, 9999999999)
             self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
         return data
+
+    def _preedit_prompt(self, prompt, nprompt):
+        # lessthan pick
+        prompt = pickedit_lessthan_str(prompt)
+        nprompt = pickedit_lessthan_str(nprompt)
+        # wildcards pick
+        prompt = self.apply_wildcards(prompt)
+        nprompt = self.apply_wildcards(nprompt)
+
+        return prompt, nprompt
 
     def on_click_generate_once(self):
         self.nai.set_param_dict(self._get_data_for_generate())
@@ -408,8 +446,7 @@ class MyWidget(QMainWindow):
         prompt = self.dict_ui_settings["prompt"].toPlainText()
         nprompt = self.dict_ui_settings["negative_prompt"].toPlainText()
 
-        wc_prompt = self.apply_wildcards(prompt)
-        wc_nprompt = self.apply_wildcards(nprompt)
+        wc_prompt, wc_nprompt = self._preedit_prompt(prompt, nprompt)
 
         self.show_prompt_dialog("와일드 카드 뽑아 보기", wc_prompt, wc_nprompt)
 
