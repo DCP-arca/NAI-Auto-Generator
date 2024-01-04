@@ -86,9 +86,12 @@ def pickedit_lessthan_str(s):
 
 def create_windows_filepath(base_path, filename, extension, max_length=260):
     # 파일 이름으로 사용할 수 없는 문자 제거
+    cleaned_filename = filename.replace("\n", "")
+    cleaned_filename = cleaned_filename.replace("\\", "")
+    
     invalid_chars = r'<>:"/\|?*'
     cleaned_filename = ''.join(
-        char for char in filename if char not in invalid_chars)
+        char for char in cleaned_filename if char not in invalid_chars)
 
     # 파일 이름의 최대 길이 제한 (확장자 길이 고려)
     max_filename_length = max_length - len(base_path) - len(extension) - 1
