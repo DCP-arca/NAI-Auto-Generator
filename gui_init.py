@@ -226,7 +226,7 @@ def init_prompt_layout(self):
     def add_textedit(vbox, code, placeholder, stretch):
         textedit = QTextEdit()
         textedit.setPlaceholderText(placeholder)
-        textedit.setAcceptRichText(True)
+        textedit.setAcceptRichText(False)
         textedit.setAcceptDrops(False)
         vbox.addWidget(textedit, stretch=stretch)
         self.dict_ui_settings[code] = textedit
