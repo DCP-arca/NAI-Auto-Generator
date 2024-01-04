@@ -72,7 +72,7 @@ RESOLUTION_FAMILIY = {
     0: ["Portrait (832x1216)", "Landscape (1216x832)", "Square (1024x1024)"],
     1: ["Portrait (1024x1536)", "Landscape (1536x1024)", "Square (1472x1472)"],
     2: ["Portrait (1088x1920)", "Landscape (1920x1088)"],
-    3: ["Portrait (512x768)", "Landscape (768x812)", "Square (640x640)"],
+    3: ["Portrait (512x768)", "Landscape (768x512)", "Square (640x640)"],
     4: []
 }
 RESOLUTION_FAMILIY_MASK = [

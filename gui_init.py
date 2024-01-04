@@ -28,7 +28,7 @@ RESOLUTION_ITEMS = [
     "Landscape (1920x1088)",
     "SMALL",
     "Portrait (512x768)",
-    "Landscape (768x812)",
+    "Landscape (768x512)",
     "Square (640x640)",
     "CUSTOM",
     "Custom",
