@@ -245,12 +245,10 @@ def init_prompt_layout(self):
     hbox_upper_buttons = QHBoxLayout()
     vbox.addLayout(hbox_upper_buttons)
 
-    hbox_upper_buttons.addStretch(2000)
     add_button(hbox_upper_buttons, "세팅 파일로 저장", self.on_click_save_settings)
     add_button(hbox_upper_buttons, "세팅 파일 불러오기", self.on_click_load_settings)
-    add_button(hbox_upper_buttons, "W.C 폴더 열기",
-               self.on_click_open_wildecards_folder)
-    add_button(hbox_upper_buttons, "W.C 뽑아 보기", self.on_click_preview_wildcard)
+    hbox_upper_buttons.addStretch(2000)
+    add_button(hbox_upper_buttons, "미리 뽑아 보기", self.on_click_preview_wildcard)
 
     vbox.addWidget(create_empty(minimum_height=5))
 
@@ -260,15 +258,18 @@ def init_prompt_layout(self):
     add_titlelabel(hbox_prompt_title, S.LABEL_PROMPT)
     hbox_prompt_title.addStretch(2000)
 
-    button_add = add_button(hbox_prompt_title, "Add", lambda: self.on_click_prompt_button("add"))
+    button_add = add_button(hbox_prompt_title, "Add",
+                            lambda: self.on_click_prompt_button("add"))
     button_add.setStyleSheet(stylesheet_button)
     button_add.setFixedSize(QSize(45, 30))
 
-    button_set = add_button(hbox_prompt_title, "Set", lambda: self.on_click_prompt_button("set"))
+    button_set = add_button(hbox_prompt_title, "Set",
+                            lambda: self.on_click_prompt_button("set"))
     button_set.setStyleSheet(stylesheet_button)
     button_set.setFixedSize(QSize(45, 30))
 
-    button_save = add_button(hbox_prompt_title, "Sav", lambda: self.on_click_prompt_button("sav"))
+    button_save = add_button(hbox_prompt_title, "Sav",
+                             lambda: self.on_click_prompt_button("sav"))
     button_save.setStyleSheet(stylesheet_button)
     button_save.setFixedSize(QSize(45, 30))
 
@@ -282,15 +283,18 @@ def init_prompt_layout(self):
     add_titlelabel(hbox_nprompt_title, S.LABEL_NPROMPT)
     hbox_nprompt_title.addStretch(2000)
 
-    button_nadd = add_button(hbox_nprompt_title, "Add", lambda: self.on_click_prompt_button("nadd"))
+    button_nadd = add_button(hbox_nprompt_title, "Add",
+                             lambda: self.on_click_prompt_button("nadd"))
     button_nadd.setStyleSheet(stylesheet_button)
     button_nadd.setFixedSize(QSize(45, 30))
 
-    button_nset = add_button(hbox_nprompt_title, "Set", lambda: self.on_click_prompt_button("nset"))
+    button_nset = add_button(hbox_nprompt_title, "Set",
+                             lambda: self.on_click_prompt_button("nset"))
     button_nset.setStyleSheet(stylesheet_button)
     button_nset.setFixedSize(QSize(45, 30))
 
-    button_nsave = add_button(hbox_nprompt_title, "Sav", lambda: self.on_click_prompt_button("nsav"))
+    button_nsave = add_button(
+        hbox_nprompt_title, "Sav", lambda: self.on_click_prompt_button("nsav"))
     button_nsave.setStyleSheet(stylesheet_button)
     button_nsave.setFixedSize(QSize(45, 30))
 
@@ -620,25 +624,47 @@ def init_buttons_layout(self):
                     }
                 """)
 
-    def add_button(hbox, text, callback, stretch=1):
+    def add_button(hbox, text, callback, minimum_width=-1, maximum_width=-1, maximum_height=-1):
         button = QPushButton(text)
         button.pressed.connect(callback)
-        hbox.addWidget(button, stretch=stretch)
+        if minimum_width != -1:
+            button.setMinimumWidth(minimum_width)
+        if maximum_width != -1:
+            button.setMaximumWidth(maximum_width)
+        if maximum_height != -1:
+            button.setMaximumHeight(maximum_height)
+        hbox.addWidget(button)
         return button
 
     main_layout = QVBoxLayout()
     hbox_generate = QHBoxLayout()
     main_layout.addLayout(hbox_generate)
-    self.button_generate_once = add_button(
-        hbox_generate, "저장 폴더 열기", self.on_click_open_results_folder)
-    hbox_generate.addStretch(1)
+
+    openfolder_group = QGroupBox("폴더 열기")
+    hbox_generate.addWidget(openfolder_group)
+
+    buttons_layout = QHBoxLayout()
+    openfolder_group.setLayout(buttons_layout)
+
+    add_button(buttons_layout, "결과",
+               lambda: self.on_click_open_folder("path_results"), 40, 40, 25)
+    add_button(buttons_layout, "W.C",
+               lambda: self.on_click_open_folder("path_wildcards"), 40, 40, 25)
+    add_button(buttons_layout, "Set",
+               lambda: self.on_click_open_folder("path_settings"), 40, 40, 25)
+    add_button(buttons_layout, "P",
+               lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
+    add_button(buttons_layout, "NP",
+               lambda: self.on_click_open_folder("path_nprompts"), 40, 40, 25)
+
+    hbox_generate.addStretch(2)
     self.label_loginstate = CustomQLabel()
     self.label_loginstate.set_logged_in(False)
     hbox_generate.addWidget(self.label_loginstate)
     self.button_generate_once = add_button(
-        hbox_generate, "생성", self.on_click_generate_once)
+        hbox_generate, "생성", self.on_click_generate_once, 200, 200)
     self.button_generate_auto = add_button(
-        hbox_generate, "연속 생성", self.on_click_generate_auto)
+        hbox_generate, "연속 생성", self.on_click_generate_auto, 200, 200)
     self.button_generate_once.setDisabled(True)
     self.button_generate_auto.setDisabled(True)
 

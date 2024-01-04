@@ -34,8 +34,6 @@ def create_folder_if_not_exists(folder_path):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
-#############################################
-
 
 def prettify_dict(d):
     return json.dumps(d, sort_keys=True, indent=4)
@@ -78,7 +76,7 @@ def pickedit_lessthan_str(s):
                 0, len(center_splited))]
 
             result_left = left + center_picked
-            pos_prev = len(result_left) + 1
+            pos_prev = len(result_left)
             edited_str = result_left + right
         else:
             pos_prev = pos_r
@@ -273,6 +271,7 @@ class MyWidget(QMainWindow):
 
     def _get_data_for_generate(self):
         data = self.get_data(True)
+        self.save_data()
 
         # data precheck
         data["prompt"], data["negative_prompt"] = self._preedit_prompt(
@@ -369,9 +368,9 @@ class MyWidget(QMainWindow):
 
         return prompt
 
-    def on_click_open_results_folder(self):
+    def on_click_open_folder(self, target_pathcode):
         path = self.settings.value(
-            "path_results", DEFAULT_PATH["path_results"])
+            target_pathcode, DEFAULT_PATH[target_pathcode])
         path = os.path.abspath(path)
         os.startfile(path)
 
@@ -453,19 +452,13 @@ class MyWidget(QMainWindow):
                     QMessageBox.information(
                         self, '경고', "저장에 실패했습니다.\n\n" + str(e))
 
-    def on_click_open_wildecards_folder(self):
-        path = self.settings.value(
-            "path_wildcards", DEFAULT_PATH["path_wildcards"])
-        path = os.path.abspath(path)
-        os.startfile(path)
-
     def on_click_preview_wildcard(self):
         prompt = self.dict_ui_settings["prompt"].toPlainText()
         nprompt = self.dict_ui_settings["negative_prompt"].toPlainText()
 
         wc_prompt, wc_nprompt = self._preedit_prompt(prompt, nprompt)
 
-        self.show_prompt_dialog("와일드 카드 뽑아 보기", wc_prompt, wc_nprompt)
+        self.show_prompt_dialog("미리 뽑아 보기", wc_prompt, wc_nprompt)
 
     def show_prompt_dialog(self, title, prompt, nprompt):
         QMessageBox.about(self, title,
