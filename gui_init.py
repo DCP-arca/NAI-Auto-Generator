@@ -47,6 +47,19 @@ def create_empty(minimum_width=0, minimum_height=0):
     return w
 
 
+def add_button(hbox, text, callback, minimum_width=-1, maximum_width=-1, maximum_height=-1):
+    button = QPushButton(text)
+    button.pressed.connect(callback)
+    if minimum_width != -1:
+        button.setMinimumWidth(minimum_width)
+    if maximum_width != -1:
+        button.setMaximumWidth(maximum_width)
+    if maximum_height != -1:
+        button.setMaximumHeight(maximum_height)
+    hbox.addWidget(button)
+    return button
+
+
 def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
@@ -216,13 +229,6 @@ def init_prompt_layout(self):
         label = QLabel(text, self)
         vbox.addWidget(label)
 
-    def add_button(hbox, text, callback):
-        button = QPushButton(text)
-        button.pressed.connect(callback)
-        hbox.addWidget(button, stretch=1)
-
-        return button
-
     def add_textedit(vbox, code, placeholder, stretch):
         textedit = QTextEdit()
         textedit.setPlaceholderText(placeholder)
@@ -247,8 +253,24 @@ def init_prompt_layout(self):
 
     add_button(hbox_upper_buttons, "세팅 파일로 저장", self.on_click_save_settings)
     add_button(hbox_upper_buttons, "세팅 파일 불러오기", self.on_click_load_settings)
-    hbox_upper_buttons.addStretch(2000)
-    add_button(hbox_upper_buttons, "미리 뽑아 보기", self.on_click_preview_wildcard)
+    hbox_upper_buttons.addWidget(create_empty(minimum_width=30), stretch=2000)
+
+    openfolder_group = QGroupBox("폴더 열기")
+    hbox_upper_buttons.addWidget(openfolder_group)
+
+    buttons_layout = QHBoxLayout()
+    openfolder_group.setLayout(buttons_layout)
+
+    add_button(buttons_layout, "결과",
+               lambda: self.on_click_open_folder("path_results"), 40, 40, 25)
+    add_button(buttons_layout, "W.C",
+               lambda: self.on_click_open_folder("path_wildcards"), 40, 40, 25)
+    add_button(buttons_layout, "Set",
+               lambda: self.on_click_open_folder("path_settings"), 40, 40, 25)
+    add_button(buttons_layout, "P",
+               lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
+    add_button(buttons_layout, "NP",
+               lambda: self.on_click_open_folder("path_nprompts"), 40, 40, 25)
 
     vbox.addWidget(create_empty(minimum_height=5))
 
@@ -304,7 +326,7 @@ def init_prompt_layout(self):
 
 
 def init_upper_options_layout(self):
-    layout = QHBoxLayout()
+    layout = QVBoxLayout()
 
     image_settings_group = QGroupBox("Image Settings")
     layout.addWidget(image_settings_group)
@@ -327,6 +349,7 @@ def init_upper_options_layout(self):
         RESOLUTION_ITEMS.index(self.settings.value(
             "resolution", DEFAULT_RESOLUTION))
     )
+    self.combo_resolution = combo_resolution
 
     class CustomDelegate(QStyledItemDelegate):
         def __init__(self, parent=None, special_indexes=None):
@@ -429,6 +452,18 @@ def init_upper_options_layout(self):
     right_layout.addWidget(self.width_edit)
     right_layout.addWidget(QLabel("높이(Height)"))
     right_layout.addWidget(self.height_edit)
+
+    # Check Box Layout
+    layout.addWidget(create_empty())
+
+    checkbox_layout = QHBoxLayout()
+    checkbox_layout.addStretch(2000)
+    checkbox_random_resolution = QCheckBox("이미지 크기 랜덤")
+    checkbox_layout.addWidget(checkbox_random_resolution)
+    checkbox_random_resolution.stateChanged.connect(
+        self.on_random_resolution_checked)
+    self.checkbox_random_resolution = checkbox_random_resolution
+    layout.addLayout(checkbox_layout)
 
     self.dict_ui_settings["resolution"] = combo_resolution
     self.dict_ui_settings["width"] = self.width_edit
@@ -624,39 +659,12 @@ def init_buttons_layout(self):
                     }
                 """)
 
-    def add_button(hbox, text, callback, minimum_width=-1, maximum_width=-1, maximum_height=-1):
-        button = QPushButton(text)
-        button.pressed.connect(callback)
-        if minimum_width != -1:
-            button.setMinimumWidth(minimum_width)
-        if maximum_width != -1:
-            button.setMaximumWidth(maximum_width)
-        if maximum_height != -1:
-            button.setMaximumHeight(maximum_height)
-        hbox.addWidget(button)
-        return button
-
     main_layout = QVBoxLayout()
     hbox_generate = QHBoxLayout()
     main_layout.addLayout(hbox_generate)
 
-    openfolder_group = QGroupBox("폴더 열기")
-    hbox_generate.addWidget(openfolder_group)
-
-    buttons_layout = QHBoxLayout()
-    openfolder_group.setLayout(buttons_layout)
-
-    add_button(buttons_layout, "결과",
-               lambda: self.on_click_open_folder("path_results"), 40, 40, 25)
-    add_button(buttons_layout, "W.C",
-               lambda: self.on_click_open_folder("path_wildcards"), 40, 40, 25)
-    add_button(buttons_layout, "Set",
-               lambda: self.on_click_open_folder("path_settings"), 40, 40, 25)
-    add_button(buttons_layout, "P",
-               lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
-    add_button(buttons_layout, "NP",
-               lambda: self.on_click_open_folder("path_nprompts"), 40, 40, 25)
-
+    add_button(
+        hbox_generate, "미리 뽑아 보기", self.on_click_preview_wildcard)
     hbox_generate.addStretch(2)
     self.label_loginstate = CustomQLabel()
     self.label_loginstate.set_logged_in(False)

@@ -17,7 +17,7 @@ from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, py
 from gui_init import init_main_widget
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, TextSaveDialog, TextLoadDialog
 
-from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING
+from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY
 
 import naiinfo_getter
 from nai_generator import NAIGenerator
@@ -282,6 +282,18 @@ class MyWidget(QMainWindow):
             data["seed"] = random.randint(0, 9999999999)
             self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
+        # wh pick
+        if strtobool(self.checkbox_random_resolution.isChecked()):
+            fl = self.get_now_resolution_familly_list()
+            if fl:
+                text = fl[random.randrange(0, len(fl))]
+
+                self.combo_resolution.setCurrentText(text)
+
+                res_text = text.split("(")[1].split(")")[0]
+                width, height = res_text.split("x")
+                data["width"], data["height"] = int(width), int(height)
+
         return data
 
     def _preedit_prompt(self, prompt, nprompt):
@@ -477,6 +489,28 @@ class MyWidget(QMainWindow):
             print(e)
             QMessageBox.information(
                 self, '경고', "정보를 읽는데 실패했습니다.\n\n" + str(e))
+
+    def on_random_resolution_checked(self, is_checked):
+        if is_checked == 2:
+            fl = self.get_now_resolution_familly_list()
+            if not fl:
+                QMessageBox.information(
+                    self, '이미지 크기 랜덤', "랜덤이 지원되지 않는 형식입니다.\n")
+            else:
+                s = ""
+                for f in fl:
+                    s += f + "\n"
+                QMessageBox.information(
+                    self, '이미지 크기 랜덤', "다음 크기 중 하나가 랜덤으로 선택됩니다.\n\n" + s)
+
+    def get_now_resolution_familly_list(self):
+        family_mask = RESOLUTION_FAMILIY_MASK[self.combo_resolution.currentIndex(
+        )]
+
+        if family_mask == -1:
+            return []
+
+        return RESOLUTION_FAMILIY[family_mask]
 
     def change_path(self, code, src):
         path = os.path.abspath(src)

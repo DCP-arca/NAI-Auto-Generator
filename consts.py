@@ -66,3 +66,31 @@ class S:
     LABEL_NPROMPT = "네거티브 프롬프트(Undesired Content)"
     LABEL_NPROMPT_HINT = "이곳에 원하지 않는 특징을 입력하세요.\n(예 - bad quality, low quality, lowres, displeasing)"
     LABEL_AISETTING = "생성 옵션(AI Settings)"
+
+
+RESOLUTION_FAMILIY = {
+    0: ["Portrait (832x1216)", "Landscape (1216x832)", "Square (1024x1024)"],
+    1: ["Portrait (1024x1536)", "Landscape (1536x1024)", "Square (1472x1472)"],
+    2: ["Portrait (1088x1920)", "Landscape (1920x1088)"],
+    3: ["Portrait (512x768)", "Landscape (768x812)", "Square (640x640)"],
+    4: []
+}
+RESOLUTION_FAMILIY_MASK = [
+    -1,
+    0,
+    0,
+    0,
+    -1,
+    1,
+    1,
+    1,
+    -1,
+    2,
+    2,
+    -1,
+    3,
+    3,
+    3,
+    -1,
+    4
+]
