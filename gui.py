@@ -1,6 +1,7 @@
 import json
 import sys
 import os
+import shutil
 import io
 import zipfile
 import time
@@ -83,6 +84,22 @@ def pickedit_lessthan_str(s):
             pos_prev = pos_r
 
     return edited_str
+
+
+def create_windows_filepath(base_path, filename, extension, max_length=260):
+    # 파일 이름으로 사용할 수 없는 문자 제거
+    invalid_chars = r'<>:"/\|?*'
+    cleaned_filename = ''.join(
+        char for char in filename if char not in invalid_chars)
+
+    # 파일 이름의 최대 길이 제한 (확장자 길이 고려)
+    max_filename_length = max_length - len(base_path) - len(extension) - 1
+    cleaned_filename = cleaned_filename[:max_filename_length]
+
+    # 경로, 파일 이름, 확장자 합치기
+    filepath = os.path.join(base_path, cleaned_filename + extension)
+
+    return filepath
 
 
 class MyWidget(QMainWindow):
@@ -761,7 +778,8 @@ class AutoGenerateThread(QThread):
 
 def _threadfunc_generate_image(thread_self):
     # 1 : get image
-    data = thread_self.parent().nai.generate_image()
+    nai = thread_self.parent().nai
+    data = nai.generate_image()
     if not data:
         return 1, "서버에서 정보를 가져오는데 실패했습니다."
 
@@ -778,8 +796,10 @@ def _threadfunc_generate_image(thread_self):
         "path_results", DEFAULT_PATH["path_results"])
     create_folder_if_not_exists(path)
     filename = datetime.datetime.now().strftime(
-        "%y%m%d_%H%M%S%f")[:-4] + ".png"
-    dst = os.path.join(path, filename)
+        "%y%m%d_%H%M%S%f")[:-4]
+    if strtobool(thread_self.parent().settings.value("will_savename_prompt", True)):
+        filename += "_" + nai.parameters["prompt"]
+    dst = create_windows_filepath(path, filename, ".png")
     try:
         img.save(dst)
     except Exception as e:

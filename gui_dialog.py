@@ -6,6 +6,24 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from consts import DEFAULT_PATH
 
 
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    if isinstance(val, bool):
+        return val
+
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+
 class LoginThread(QThread):
     login_result = pyqtSignal(int)
 
@@ -385,6 +403,12 @@ class OptionDialog(QDialog):
         add_item(layout, "path_nprompts", "네거티브 프롬프트 저장 위치 : ")
         add_item(layout, "path_settings", "세팅 파일 저장 위치 : ")
 
+        checkbox_savepname = QCheckBox("파일 생성시 이름에 프롬프트 넣기")
+        checkbox_savepname.setChecked(strtobool(
+            self.parent.settings.value("will_savename_prompt", True)))
+        self.checkbox_savepname = checkbox_savepname
+        layout.addWidget(checkbox_savepname)
+
         button_close = QPushButton("닫기")
         button_close.clicked.connect(self.on_click_close_button)
         self.button_close = button_close
@@ -418,4 +442,6 @@ class OptionDialog(QDialog):
         self.dict_label_loc[code].setText(path)
 
     def on_click_close_button(self):
+        self.parent.settings.setValue(
+            "will_savename_prompt", self.checkbox_savepname.isChecked())
         self.reject()
