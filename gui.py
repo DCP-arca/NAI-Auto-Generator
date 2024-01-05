@@ -94,7 +94,7 @@ def create_windows_filepath(base_path, filename, extension, max_length=260):
         char for char in cleaned_filename if char not in invalid_chars)
 
     # 파일 이름의 최대 길이 제한 (확장자 길이 고려)
-    max_filename_length = max_length - len(base_path) - len(extension) - 1
+    max_filename_length = max_length - len(base_path) - len(extension) - 20
     cleaned_filename = cleaned_filename[:max_filename_length]
 
     # 경로, 파일 이름, 확장자 합치기
