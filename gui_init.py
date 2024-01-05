@@ -12,7 +12,7 @@ from consts import COLOR, S
 ########################################################
 
 SAMPLER_ITEMS = ['k_euler', 'k_euler_ancestral',
-                 'k_dpmpp_2s_ancestral', 'k_dpmpp_sde']
+                 'k_dpmpp_2s_ancestral', "k_dpmpp_2m", 'k_dpmpp_sde', "ddim"]
 
 RESOLUTION_ITEMS = [
     "NORMAL",

@@ -84,7 +84,7 @@ def pickedit_lessthan_str(s):
     return edited_str
 
 
-def create_windows_filepath(base_path, filename, extension, max_length=260):
+def create_windows_filepath(base_path, filename, extension, max_length=150):
     # 파일 이름으로 사용할 수 없는 문자 제거
     cleaned_filename = filename.replace("\n", "")
     cleaned_filename = cleaned_filename.replace("\\", "")
@@ -94,7 +94,9 @@ def create_windows_filepath(base_path, filename, extension, max_length=260):
         char for char in cleaned_filename if char not in invalid_chars)
 
     # 파일 이름의 최대 길이 제한 (확장자 길이 고려)
-    max_filename_length = max_length - len(base_path) - len(extension) - 20
+    max_filename_length = max_length - len(base_path) - len(extension) - 1
+    if max_filename_length < 5:
+        return None
     cleaned_filename = cleaned_filename[:max_filename_length]
 
     # 경로, 파일 이름, 확장자 합치기
@@ -825,11 +827,14 @@ def _threadfunc_generate_image(thread_self):
     path = thread_self.parent().settings.value(
         "path_results", DEFAULT_PATH["path_results"])
     create_folder_if_not_exists(path)
-    filename = datetime.datetime.now().strftime(
+    timename = datetime.datetime.now().strftime(
         "%y%m%d_%H%M%S%f")[:-4]
+    filename = timename
     if strtobool(thread_self.parent().settings.value("will_savename_prompt", True)):
         filename += "_" + nai.parameters["prompt"]
     dst = create_windows_filepath(path, filename, ".png")
+    if not dst:
+        dst = timename
     try:
         img.save(dst)
     except Exception as e:
