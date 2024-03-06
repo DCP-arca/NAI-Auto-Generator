@@ -160,7 +160,6 @@ class MyWidget(QMainWindow):
         self.is_expand = False
         self.trying_auto_login = False
         self.autogenerate_thread = None
-        self.last_parameter = DEFAULT_SETTING
         self.dict_img_batch_target = {
             "img2img_foldersrc": "",
             "img2img_index": -1,
@@ -628,6 +627,10 @@ class MyWidget(QMainWindow):
         self.button_generate_once.setDisabled(will_disable)
         self.button_generate_auto.setDisabled(will_disable)
 
+    def set_result_text(self, naidict):
+        QTimer.singleShot(20, lambda: self.prompt_result.setText(
+            prettify_naidict(naidict)))
+
     def refresh_anlas(self):
         anlas_thread = AnlasThread(self)
         anlas_thread.anlas_result.connect(self._on_refresh_anlas)
@@ -863,7 +866,7 @@ class AutoGenerateThread(QThread):
             if not temp_preserve_data_once:
                 data = parent._get_data_for_generate()
                 parent.nai.set_param_dict(data)
-                parent.prompt_result.setText(prettify_naidict(data))
+                parent.set_result_text(data)
             temp_preserve_data_once = False
 
             # set status bar
@@ -883,10 +886,13 @@ class AutoGenerateThread(QThread):
 
                 parent.image_result.set_custom_pixmap(result_str)
 
-                parent.last_parameter = data
+                if "image" in parent.nai.parameters and parent.nai.parameters["image"]:
+                    parent.proceed_image_batch("img2img")
+                if "reference_image" in parent.nai.parameters and parent.nai.parameters["reference_image"]:
+                    parent.proceed_image_batch("vibe")
             else:
                 if self.ignore_error:
-                    for t in range(DEFAULT_VALUE.AMOUNT_WAIT_WHEN_ERROR_OCCUR, 0, -1):
+                    for t in range(int(delay), 0, -1):
                         parent.set_statusbar_text("AUTO_ERROR_WAIT", [t])
                         time.sleep(1)
                         if self.is_dead:

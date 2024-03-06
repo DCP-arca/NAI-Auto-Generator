@@ -185,7 +185,7 @@ class GenerateDialog(QDialog):
 
         self.setWindowTitle('자동 생성')
         self.move(parent_pos.x() + 50, parent_pos.y() + 50)
-        self.setFixedSize(335, 200)
+        self.setFixedSize(400, 200)
 
         layout = QVBoxLayout()
         self.setLayout(layout)
@@ -203,7 +203,7 @@ class GenerateDialog(QDialog):
         layout_delay = QHBoxLayout()
         layout.addLayout(layout_delay)
 
-        label_delay = QLabel("지연 시간(매 생성마다 대기) : ", self)
+        label_delay = QLabel("지연 시간(매 생성시, 에러시 대기시간) : ", self)
         layout_delay.addWidget(label_delay, 1)
         lineedit_delay = QLineEdit("3")
         lineedit_delay.setMaximumWidth(40)
