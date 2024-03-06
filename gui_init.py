@@ -363,21 +363,6 @@ def init_prompt_layout(self):
         label = QLabel(title_text)
         hbox_prompt_title.addWidget(label)
 
-        # button_add = add_button(hbox_prompt_title, "Add",
-        #                         lambda: self.on_click_prompt_button(list_buttoncode[0]))
-        # button_add.setStyleSheet(stylesheet_button)
-        # button_add.setFixedSize(QSize(45, 30))
-
-        # button_set = add_button(hbox_prompt_title, "Set",
-        #                         lambda: self.on_click_prompt_button(list_buttoncode[1]))
-        # button_set.setStyleSheet(stylesheet_button)
-        # button_set.setFixedSize(QSize(45, 30))
-
-        # button_save = add_button(hbox_prompt_title, "Sav",
-        #                          lambda: self.on_click_prompt_button(list_buttoncode[2]))
-        # button_save.setStyleSheet(stylesheet_button)
-        # button_save.setFixedSize(QSize(45, 30))
-
         return hbox_prompt_title
 
     def create_prompt_edit(self, placeholder_text, code):
@@ -932,11 +917,6 @@ def init_buttons_layout(self):
         background-color:#00000000;
         border: 1px solid white;
     """
-
-    button_info = add_button(
-        hbox_expand, "i", self.on_click_imageinfo)
-    button_info.setStyleSheet(stylesheet_button)
-    button_info.setFixedSize(QSize(30, 30))
 
     button_expand = add_button(
         hbox_expand, "<<", self.on_click_expand)

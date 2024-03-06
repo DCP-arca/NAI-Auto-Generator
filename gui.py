@@ -38,13 +38,16 @@ def prettify_dict(d):
 
 
 def prettify_naidict(d):
-    content = f"""프롬프트 : {d['prompt']}
+    content = f"""프롬프트 :
+{d['prompt']}
 
-네거티브 프롬프트 : {d['negative_prompt']}
+네거티브 프롬프트 :
+{d['negative_prompt']}
 
-이미지 크기 : 가로 {d['width']}, 세로 {d['height']}
+이미지 크기 :
+    가로 {d['width']}, 세로 {d['height']}
 
-옵션들 :
+옵션 :
     scale : {d['scale']}
     sampler : {d['sampler']}
     seed : {d['seed']}
@@ -477,58 +480,6 @@ class MyWidget(QMainWindow):
                 QMessageBox.information(
                     self, '경고', "세팅을 불러오는데 실패했습니다.\n\n" + str(e))
 
-    def on_click_prompt_button(self, key):
-        if key[0] == "n":
-            target_textedit = self.dict_ui_settings["negative_prompt"]
-            target_path = "path_nprompts"
-        else:
-            target_textedit = self.dict_ui_settings["prompt"]
-            target_path = "path_prompts"
-        mode = key[-3:]
-
-        path = self.settings.value(target_path, DEFAULT_PATH[target_path])
-        path = os.path.abspath(path)
-
-        print(mode)
-        if mode == "add" or mode == "set":
-            str_title = '추가하기' if mode == "add" else "덮어쓰기"
-            d = TextLoadDialog(self, path, str_title)
-            if d.exec_() == QDialog.Accepted:
-                try:
-                    with open(d.selected_filepath, "r", encoding="utf8") as f:
-                        txt = f.read()
-
-                        if mode == "add":
-                            target_textedit.textCursor(
-                            ).insertText(txt)
-                        else:
-                            target_textedit.setText(txt)
-                except Exception as e:
-                    print(e)
-                    str_warning = ('추가' if mode == "add" else '덮어쓰는') + \
-                        " 중 문제가 발생했습니다."
-                    QMessageBox.information(
-                        self, '경고', str_warning + "\n\n" + str(e))
-        elif mode == "sav":
-            file_path, _ = QFileDialog.getSaveFileName(
-                self, "파일을 저장할 곳을 선택해주세요", "", "Txt File (*.txt)")
-            if file_path:
-                try:
-                    with open(file_path, "w", encoding="utf8") as f:
-                        f.write(target_textedit.toPlainText())
-                except Exception as e:
-                    print(e)
-                    QMessageBox.information(
-                        self, '경고', "저장에 실패했습니다.\n\n" + str(e))
-
-    # def on_click_preview_wildcard(self):
-    #     prompt = self.dict_ui_settings["prompt"].toPlainText()
-    #     nprompt = self.dict_ui_settings["negative_prompt"].toPlainText()
-
-    #     wc_prompt, wc_nprompt = self._preedit_prompt(prompt, nprompt)
-
-    #     self.show_prompt_dialog("미리 뽑아 보기", wc_prompt, wc_nprompt)
-
     def show_prompt_dialog(self, title, prompt, nprompt):
         QMessageBox.about(self, title,
                           "프롬프트:\n" +
@@ -536,16 +487,6 @@ class MyWidget(QMainWindow):
                           "\n\n" +
                           "네거티브 프롬프트:\n" +
                           nprompt)
-
-    def on_click_imageinfo(self):
-        try:
-            prompt = self.last_parameter["prompt"]
-            nprompt = self.last_parameter["negative_prompt"]
-            self.show_prompt_dialog("생성 이미지 프롬프트 보기", prompt, nprompt)
-        except Exception as e:
-            print(e)
-            QMessageBox.information(
-                self, '경고', "정보를 읽는데 실패했습니다.\n\n" + str(e))
 
     def on_random_resolution_checked(self, is_checked):
         if is_checked == 2:

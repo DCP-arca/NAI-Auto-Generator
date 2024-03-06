@@ -150,12 +150,13 @@ class NAIGenerator():
 
     def set_param_dict(self, param_dict):
         for k, v in param_dict.items():
-            try:
-                param_key = NAIParam[k]
-                self.set_param(param_key, v)
-            except Exception as e:
-                print("NAIGenerator", "wrong param", e, k)
-                continue
+            if k and v:
+                try:
+                    param_key = NAIParam[k]
+                    self.set_param(param_key, v)
+                except Exception as e:
+                    print("NAIGenerator", "wrong param", e, k)
+                    continue
 
     def get_anlas(self):
         try:
