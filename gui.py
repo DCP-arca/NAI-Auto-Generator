@@ -13,9 +13,9 @@ from urllib import request
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
 from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QRect
 from gui_init import init_main_widget
-from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, TextSaveDialog, TextLoadDialog
+from gui_dialog import LoginDialog, OptionDialog, GenerateDialog
 
-from consts import COLOR, S, DEFAULT_VALUE, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY
+from consts import COLOR, S, DEFAULT_VALUE, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict
 
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction
@@ -28,45 +28,38 @@ APP_NAME = "nag_gui"
 #############################################
 
 
-def create_folder_if_not_exists(folder_path):
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+def create_folder_if_not_exists(foldersrc):
+    if not os.path.exists(foldersrc):
+        os.makedirs(foldersrc)
 
 
 def prettify_dict(d):
     return json.dumps(d, sort_keys=True, indent=4)
 
 
-def prettify_naidict(d):
-    content = f"""프롬프트 :
-{d['prompt']}
+def get_imgcount_from_foldersrc(foldersrc):
+    return len([file for file in os.listdir(foldersrc) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))])
 
-네거티브 프롬프트 :
-{d['negative_prompt']}
 
-이미지 크기 :
-    가로 {d['width']}, 세로 {d['height']}
+def pick_imgsrc_from_foldersrc(foldersrc, index, sort_order):
+    files = [file for file in os.listdir(foldersrc) if file.lower(
+    ).endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
 
-옵션 :
-    scale : {d['scale']}
-    sampler : {d['sampler']}
-    seed : {d['seed']}
-    cfg_rescale : {d['cfg_rescale']}
-    uncond_scale : {d['uncond_scale']}
-    sm : {d['sm']}
-    sm_dyn : {d['sm_dyn']}"""
+    # 파일들을 정렬
+    if sort_order == '오름차순':
+        files.sort()
+    elif sort_order == '내림차순':
+        files.sort(reverse=True)
+    elif sort_order == '랜덤':
+        random.seed(random.randint(0, 1000000))
+        random.shuffle(files)
 
-    if d['image']:
-        content += f"""\n\nI2I 모드 :
-    strength : {d['strength']}
-    noise : {d['noise']}"""
+    # 인덱스가 파일 개수를 초과하는 경우
+    while index >= len(files):
+        index -= len(files)
 
-    if d['reference_image']:
-        content += f"""\n\n바이브 적용중 :
-    reference_information_extracted : {d['reference_information_extracted']}
-    reference_strength : {d['reference_strength']}"""
-
-    return content
+    # 정렬된 파일 리스트에서 인덱스에 해당하는 파일의 주소 반환
+    return os.path.join(foldersrc, files[index])
 
 
 def strtobool(val):
@@ -157,6 +150,13 @@ class MyWidget(QMainWindow):
         self.trying_auto_login = False
         self.autogenerate_thread = None
         self.last_parameter = DEFAULT_SETTING
+        self.dict_img_batch_target = {
+            "img2img_foldersrc": "",
+            "img2img_index": -1,
+            "vibe_foldersrc": "",
+            "vibe_index": -1
+
+        }
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
@@ -385,6 +385,11 @@ class MyWidget(QMainWindow):
 
         if error_code == 0:
             self.image_result.set_custom_pixmap(result)
+
+            if "image" in self.nai.parameters and self.nai.parameters["image"]:
+                self.proceed_image_batch("img2img")
+            if "reference_image" in self.nai.parameters and self.nai.parameters["reference_image"]:
+                self.proceed_image_batch("vibe")
         else:
             QMessageBox.information(
                 self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
@@ -449,11 +454,9 @@ class MyWidget(QMainWindow):
     def on_click_save_settings(self):
         path = self.settings.value(
             "path_settings", DEFAULT_PATH["path_settings"])
-        path = os.path.abspath(path)
-        d = TextSaveDialog(self, path, "세팅 파일 저장")
-        if d.exec_() == QDialog.Accepted:
-            path = os.path.join(path, d.filename + ".txt")
-
+        path, _ = QFileDialog.getSaveFileName(
+            self, "세팅 파일을 저장할 곳을 선택해주세요", path, "Txt File (*.txt)")
+        if path:
             try:
                 json_str = json.dumps(self.get_data(True))
                 with open(path, "w", encoding="utf8") as f:
@@ -466,11 +469,14 @@ class MyWidget(QMainWindow):
     def on_click_load_settings(self):
         path = self.settings.value(
             "path_settings", DEFAULT_PATH["path_settings"])
-        path = os.path.abspath(path)
-        d = TextLoadDialog(self, path, '세팅 파일 불러오기')
-        if d.exec_() == QDialog.Accepted:
+
+        select_dialog = QFileDialog()
+        select_dialog.setFileMode(QFileDialog.ExistingFile)
+        path, _ = select_dialog.getOpenFileName(
+            self, "불러올 세팅 파일을 선택해주세요", path, "Txt File (*.txt)")
+        if path:
             try:
-                with open(d.selected_filepath, "r", encoding="utf8") as f:
+                with open(path, "r", encoding="utf8") as f:
                     json_str = f.read()
                 json_obj = json.loads(json_str)
 
@@ -639,7 +645,7 @@ class MyWidget(QMainWindow):
         select_dialog = QFileDialog()
         select_dialog.setFileMode(QFileDialog.ExistingFile)
         fname = select_dialog.getOpenFileName(
-            self, 'Open image file or txt file to get nai data', '', 'Image File, Text File(*.txt *.png *.webp)')
+            self, '불러올 파일을 선택해 주세요.', '', '이미지, 텍스트 파일(*.txt *.png *.webp)')
 
         if fname[0]:
             fname = fname[0]
@@ -656,21 +662,63 @@ class MyWidget(QMainWindow):
             else:
                 if fname.endswith(".png") or fname.endswith(".webp"):
                     self.set_image_as_param(mode, fname)
+                    target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
+                    target_group.set_folder_mode(False)
+                elif os.path.isdir(fname):
+                    self.set_imagefolder_as_param(mode, fname)
                 else:
                     QMessageBox.information(
-                        self, '경고', "png, webp 파일만 가능합니다.")
+                        self, '경고', "png, webp 또는 폴더만 가능합니다.")
                     return
 
+    def show_openfolder_dialog(self, mode):
+        select_dialog = QFileDialog()
+        select_dialog.setFileMode(QFileDialog.Directory)
+        select_dialog.setOption(QFileDialog.Option.ShowDirsOnly)
+        fname = select_dialog.getExistingDirectory(
+            self, mode + '모드로 열 폴더를 선택해주세요.', '')
+
+        if fname:
+            if os.path.isdir(fname):
+                self.set_imagefolder_as_param(mode, fname)
+            else:
+                QMessageBox.information(
+                    self, '경고', "폴더만 선택 가능합니다.")
+
     def set_image_as_param(self, mode, src):
-        if mode == "i2i":
+        if mode == "img2img":
             self.i2i_settings_group.set_image(src)
-            self.i2i_settings_group.set_folder_mode(False)
             self.image_options_layout.setStretch(0, 1)
         if mode == "vibe":
             self.vibe_settings_group.set_image(src)
-            self.i2i_settings_group.set_folder_mode(False)
             self.image_options_layout.setStretch(1, 1)
         self.image_options_layout.setStretch(2, 0)
+
+    def set_imagefolder_as_param(self, mode, foldersrc):
+        if get_imgcount_from_foldersrc(foldersrc) == 0:
+            QMessageBox.information(
+                self, '경고', "이미지 파일이 없는 폴더입니다")
+            return
+
+        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
+        target_group.set_folder_mode(True)
+
+        self.dict_img_batch_target[mode + "_foldersrc"] = foldersrc
+        self.dict_img_batch_target[mode + "_index"] = -1
+
+        self.proceed_image_batch(mode)
+
+    def proceed_image_batch(self, mode):
+        self.dict_img_batch_target[mode + "_index"] += 1
+        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
+
+        src = pick_imgsrc_from_foldersrc(
+            foldersrc=self.dict_img_batch_target[mode + "_foldersrc"],
+            index=self.dict_img_batch_target[mode + "_index"],
+            sort_order=target_group.get_folder_sort_mode()
+        )
+
+        self.set_image_as_param(mode, src)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -690,17 +738,27 @@ class MyWidget(QMainWindow):
             fname = furl.toLocalFile()
             if fname.endswith(".png") or fname.endswith(".webp"):
                 if self.i2i_settings_group.geometry().contains(event.pos()):
-                    self.set_image_as_param("i2i", fname)
+                    self.set_image_as_param("img2img", fname)
+                    self.i2i_settings_group.set_folder_mode(False)
                 elif self.vibe_settings_group.geometry().contains(event.pos()):
                     self.set_image_as_param("vibe", fname)
+                    self.vibe_settings_group.set_folder_mode(False)
                 else:
                     self.get_image_info_bysrc(fname)
+                return
             elif fname.endswith(".txt"):
                 self.get_image_info_bytxt(fname)
-            else:
-                QMessageBox.information(
-                    self, '경고', "png, webp, txt 파일만 가능합니다.")
                 return
+            elif os.path.isdir(fname):
+                if self.i2i_settings_group.geometry().contains(event.pos()):
+                    self.set_imagefolder_as_param("img2img", fname)
+                    return
+                elif self.vibe_settings_group.geometry().contains(event.pos()):
+                    self.set_imagefolder_as_param("vibe", fname)
+                    return
+
+            QMessageBox.information(
+                self, '경고', "png, webp, txt 파일만 가능합니다.")
         else:
             self.set_statusbar_text("LOADING")
             try:

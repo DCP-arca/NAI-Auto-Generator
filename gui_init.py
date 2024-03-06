@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt5.QtWidgets import QWidget, QLabel, QTextEdit, QLineEdit, QCheckBox, QStyledItemDelegate, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QGroupBox, QSlider, QFrame, QSplitter, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QTextEdit, QLineEdit, QCheckBox, QStyledItemDelegate, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QGroupBox, QSlider, QFrame, QSplitter, QSizePolicy
 from PyQt5.QtGui import QColor, QIntValidator, QFont, QPalette, QPixmap, QImage, QPainter
 from PyQt5.QtCore import Qt, QSize, QEvent, QTimer, QRectF, pyqtSignal
 
@@ -69,13 +69,15 @@ DEFAULT_RESOLUTION = "Square (640x640)"
 ########################################################
 
 
-def create_empty(minimum_width=1, minimum_height=1, fixed_height=0):
+def create_empty(minimum_width=1, minimum_height=1, fixed_height=0, maximum_height=0):
     w = QWidget()
     w.setMinimumWidth(minimum_width)
     w.setMinimumHeight(minimum_height)
     w.setStyleSheet("background-color:#00000000")
     if fixed_height != 0:
         w.setFixedHeight(fixed_height)
+    if maximum_height != 0:
+        w.setMaximumHeight(maximum_height)
     return w
 
 
@@ -676,33 +678,46 @@ def init_paramater_options_layout(self):
 
 def init_image_options_layout(self):
     class ImageSettingGroup(QGroupBox):
-        def __init__(self, title, slider_1, slider_2, clicked_func):
+        def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder):
             super(ImageSettingGroup, self).__init__(title)
             self.setAcceptDrops(True)
 
             settings_layout = QVBoxLayout()
             self.setLayout(settings_layout)
 
+            ###################################
             # Before
             before_frame = QFrame()
             settings_layout.addWidget(before_frame)
 
             before_layout = QVBoxLayout()
             before_layout.setAlignment(Qt.AlignCenter)
-
-            before_layout.addStretch(1)
-            open_image_button = ResultImageView(
-                resource_path("open_image.png"))
-            open_image_button.setStyleSheet("""
-                background-color: """ + COLOR.BRIGHT + """;
-                background-position: center
-            """)
-            open_image_button.setFixedSize(QSize(100, 100))
-            open_image_button.clicked.connect(clicked_func)
-            before_layout.addWidget(open_image_button, stretch=1)
-            before_layout.addStretch(1)
             before_frame.setLayout(before_layout)
 
+            before_layout.addStretch(1)
+            before_inner_layout = QHBoxLayout()
+            before_layout.addLayout(before_inner_layout, stretch=1)
+            before_layout.addStretch(1)
+
+            def create_open_button(img_src, func):
+                open_button = ResultImageView(
+                    resource_path(img_src))
+                open_button.setStyleSheet("""
+                    background-color: """ + COLOR.BRIGHT + """;
+                    background-position: center
+                """)
+                open_button.setFixedSize(QSize(80, 80))
+                open_button.clicked.connect(func)
+                return open_button
+            before_inner_layout.addStretch(1)
+            before_inner_layout.addWidget(
+                create_open_button("open_image.png", func_open_img), stretch=1)
+            before_inner_layout.addStretch(1)
+            before_inner_layout.addWidget(
+                create_open_button("open_folder.png", func_open_folder), stretch=1)
+            before_inner_layout.addStretch(1)
+
+            ###################################
             # After
             # background frame
             after_frame = BackgroundFrame()
@@ -714,19 +729,47 @@ def init_image_options_layout(self):
             after_frame.setLayout(after_layout)
 
             # slider
-            after_layout.addLayout(slider_1)
-            after_layout.addLayout(slider_2)
+            after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
+            after_layout.addLayout(slider_1, stretch=1)
+            after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
+            after_layout.addLayout(slider_2, stretch=1)
+
+            # stretch
+            after_layout.addStretch(99)
+
+            folder_layout = QHBoxLayout()
+            after_layout.addLayout(folder_layout, stretch=1)
+            after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
+
+            # radio_sort
+            groupBox_loadmode = QGroupBox("정렬 모드 선택")
+            groupBox_loadmode.setStyleSheet("""
+                QGroupBox{background-color:#00000000}
+                QRadioButton{background-color:#00000000}
+                """)
+            self.groupBox_loadmode = groupBox_loadmode
+            folder_layout.addWidget(groupBox_loadmode)
+
+            groupBoxLayout_loadmode = QHBoxLayout()
+            groupBox_loadmode.setLayout(groupBoxLayout_loadmode)
+
+            self.folder_radio1 = QRadioButton("오름차순")
+            self.folder_radio1.setChecked(True)
+            self.folder_radio2 = QRadioButton("내림차순")
+            self.folder_radio3 = QRadioButton("랜덤")
+            groupBoxLayout_loadmode.addWidget(self.folder_radio1)
+            groupBoxLayout_loadmode.addWidget(self.folder_radio2)
+            groupBoxLayout_loadmode.addWidget(self.folder_radio3)
 
             # folder_label
             folder_label = QLabel()
             folder_label.setStyleSheet("background-color:#00000000")
-            folder_label.setFixedHeight(30)
-            folder_label.setAlignment(Qt.AlignRight)
-            after_layout.addWidget(folder_label)
+            folder_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            folder_layout.addWidget(folder_label)
 
             # target_layout
             target_layout = QHBoxLayout()
-            target_title = QLabel("대상: ")
+            target_title = QLabel("현재 대상: ")
             target_title.setStyleSheet("background-color:#00000000")
             target_layout.addWidget(target_title)
 
@@ -738,12 +781,12 @@ def init_image_options_layout(self):
             target_layout.addWidget(target_content_label)
 
             target_remove_button = QPushButton("제거")
-            target_remove_button.setMaximumWidth(80)
             target_layout.addWidget(target_remove_button)
 
             target_layout.label = target_content_label
             target_layout.button = target_remove_button
-            after_layout.addLayout(target_layout)
+            after_layout.addLayout(target_layout, stretch=1)
+            after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
 
             self.target_remove_button = target_remove_button
             self.folder_label = folder_label
@@ -769,7 +812,19 @@ def init_image_options_layout(self):
                 self.target_content_label.setText("")
 
         def set_folder_mode(self, is_folder_mode):
+            self.folder_radio1.setChecked(True)
+            self.folder_radio2.setChecked(False)
+            self.folder_radio3.setChecked(False)
+            self.groupBox_loadmode.setVisible(is_folder_mode)
             self.folder_label.setText("(폴더 모드)" if is_folder_mode else " ")
+
+        def get_folder_sort_mode(self):
+            if self.folder_radio1.isChecked():
+                return "오름차순"
+            elif self.folder_radio2.isChecked():
+                return "내림차순"
+            elif self.folder_radio3.isChecked():
+                return "랜덤"
 
         def connect_on_click_removebutton(self, func):
             self.target_remove_button.pressed.connect(func)
@@ -799,7 +854,8 @@ def init_image_options_layout(self):
             slider_text_lambda=lambda value: "%.2f" % (value / 100),
             gui_nobackground=True
         ),
-        clicked_func=lambda: self.show_file_dialog("i2i")
+        func_open_img=lambda: self.show_file_dialog("img2img"),
+        func_open_folder=lambda: self.show_openfolder_dialog("img2img")
     )
 
     def i2i_on_click_removebutton():
@@ -832,7 +888,8 @@ def init_image_options_layout(self):
             slider_text_lambda=lambda value: "%.2f" % (value / 100),
             gui_nobackground=True
         ),
-        clicked_func=lambda: self.show_file_dialog("vibe")
+        func_open_img=lambda: self.show_file_dialog("vibe"),
+        func_open_folder=lambda: self.show_openfolder_dialog("vibe")
     )
 
     def vibe_on_click_removebutton():

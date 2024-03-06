@@ -1,3 +1,35 @@
+def prettify_naidict(d):
+    content = f"""프롬프트 :
+{d['prompt']}
+
+네거티브 프롬프트 :
+{d['negative_prompt']}
+
+이미지 크기 :
+    가로 {d['width']}, 세로 {d['height']}
+
+옵션 :
+    scale : {d['scale']}
+    sampler : {d['sampler']}
+    seed : {d['seed']}
+    cfg_rescale : {d['cfg_rescale']}
+    uncond_scale : {d['uncond_scale']}
+    sm : {d['sm']}
+    sm_dyn : {d['sm_dyn']}"""
+
+    if d['image']:
+        content += f"""\n\nI2I 모드 :
+    strength : {d['strength']}
+    noise : {d['noise']}"""
+
+    if d['reference_image']:
+        content += f"""\n\n바이브 적용중 :
+    reference_information_extracted : {d['reference_information_extracted']}
+    reference_strength : {d['reference_strength']}"""
+
+    return content
+
+
 class DEFAULT_VALUE:
     AMOUNT_WAIT_WHEN_ERROR_OCCUR = 1
 
