@@ -1,9 +1,19 @@
 import os
 
-from PyQt5.QtWidgets import QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 
 from consts import DEFAULT_PATH
+
+
+def create_empty(minimum_width=1, minimum_height=1, fixed_height=0):
+    w = QWidget()
+    w.setMinimumWidth(minimum_width)
+    w.setMinimumHeight(minimum_height)
+    w.setStyleSheet("background-color:#00000000")
+    if fixed_height != 0:
+        w.setFixedHeight(fixed_height)
+    return w
 
 
 def strtobool(val):
@@ -399,9 +409,11 @@ class OptionDialog(QDialog):
 
         add_item(layout, "path_results", "생성이미지 저장 위치 : ")
         add_item(layout, "path_wildcards", "와일드카드 저장 위치 : ")
-        add_item(layout, "path_prompts", "프롬프트 저장 위치 : ")
-        add_item(layout, "path_nprompts", "네거티브 프롬프트 저장 위치 : ")
+        # add_item(layout, "path_prompts", "프롬프트 저장 위치 : ")
+        # add_item(layout, "path_nprompts", "네거티브 프롬프트 저장 위치 : ")
         add_item(layout, "path_settings", "세팅 파일 저장 위치 : ")
+
+        layout.addWidget(create_empty(minimum_height=6))
 
         checkbox_savepname = QCheckBox("파일 생성시 이름에 프롬프트 넣기")
         checkbox_savepname.setChecked(strtobool(

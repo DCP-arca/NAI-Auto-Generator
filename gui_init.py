@@ -363,20 +363,20 @@ def init_prompt_layout(self):
         label = QLabel(title_text)
         hbox_prompt_title.addWidget(label)
 
-        button_add = add_button(hbox_prompt_title, "Add",
-                                lambda: self.on_click_prompt_button(list_buttoncode[0]))
-        button_add.setStyleSheet(stylesheet_button)
-        button_add.setFixedSize(QSize(45, 30))
+        # button_add = add_button(hbox_prompt_title, "Add",
+        #                         lambda: self.on_click_prompt_button(list_buttoncode[0]))
+        # button_add.setStyleSheet(stylesheet_button)
+        # button_add.setFixedSize(QSize(45, 30))
 
-        button_set = add_button(hbox_prompt_title, "Set",
-                                lambda: self.on_click_prompt_button(list_buttoncode[1]))
-        button_set.setStyleSheet(stylesheet_button)
-        button_set.setFixedSize(QSize(45, 30))
+        # button_set = add_button(hbox_prompt_title, "Set",
+        #                         lambda: self.on_click_prompt_button(list_buttoncode[1]))
+        # button_set.setStyleSheet(stylesheet_button)
+        # button_set.setFixedSize(QSize(45, 30))
 
-        button_save = add_button(hbox_prompt_title, "Sav",
-                                 lambda: self.on_click_prompt_button(list_buttoncode[2]))
-        button_save.setStyleSheet(stylesheet_button)
-        button_save.setFixedSize(QSize(45, 30))
+        # button_save = add_button(hbox_prompt_title, "Sav",
+        #                          lambda: self.on_click_prompt_button(list_buttoncode[2]))
+        # button_save.setStyleSheet(stylesheet_button)
+        # button_save.setFixedSize(QSize(45, 30))
 
         return hbox_prompt_title
 
@@ -399,11 +399,15 @@ def init_prompt_layout(self):
     vbox.addWidget(create_prompt_edit(
         self, S.LABEL_PROMPT_HINT, "prompt"), stretch=10)
 
+    vbox.addWidget(create_empty(minimum_height=6))
+
     vbox.addLayout(create_prompt_layout(
         self, S.LABEL_NPROMPT, ["nadd", "nset", "nsav"]))
 
     vbox.addWidget(create_prompt_edit(
         self, S.LABEL_NPROMPT_HINT, "negative_prompt"), stretch=10)
+
+    vbox.addWidget(create_empty(minimum_height=6))
 
     vbox.addWidget(QLabel("결과창"))
     prompt_result = QTextEdit("")
@@ -958,15 +962,15 @@ def init_openfolder_group(self,):
     buttons_layout = QHBoxLayout()
     openfolder_group.setLayout(buttons_layout)
 
-    add_button(buttons_layout, "결과",
-               lambda: self.on_click_open_folder("path_results"), 40, 40, 25)
-    add_button(buttons_layout, "W.C",
-               lambda: self.on_click_open_folder("path_wildcards"), 40, 40, 25)
-    add_button(buttons_layout, "Set",
-               lambda: self.on_click_open_folder("path_settings"), 40, 40, 25)
-    add_button(buttons_layout, "P",
-               lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
-    add_button(buttons_layout, "NP",
-               lambda: self.on_click_open_folder("path_nprompts"), 40, 40, 25)
+    add_button(buttons_layout, "생성 결과",
+               lambda: self.on_click_open_folder("path_results"), 100)
+    add_button(buttons_layout, "와일드 카드",
+               lambda: self.on_click_open_folder("path_wildcards"), 115)
+    add_button(buttons_layout, "세팅 파일",
+               lambda: self.on_click_open_folder("path_settings"), 100)
+    # add_button(buttons_layout, "P",
+    #            lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
+    # add_button(buttons_layout, "NP",
+    #            lambda: self.on_click_open_folder("path_nprompts"), 40, 40, 25)
 
     return openfolder_group

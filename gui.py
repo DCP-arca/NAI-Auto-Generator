@@ -159,7 +159,7 @@ class MyWidget(QMainWindow):
         self.setWindowTitle(TITLE_NAME)
         self.settings = QSettings(TOP_NAME, APP_NAME)
         self.move(self.settings.value("pos", QPoint(500, 200)))
-        self.resize(self.settings.value("size", QSize(1000, 1200)))
+        self.resize(self.settings.value("size", QSize(1179, 1044)))
         self.settings.setValue("splitterSizes", None)
         self.setAcceptDrops(True)
 
