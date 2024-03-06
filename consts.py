@@ -35,8 +35,6 @@ class DEFAULT_VALUE:
 
 
 DEFAULT_PATH = {
-    "path_prompts": "prompts/",
-    "path_nprompts": "negative_prompts/",
     "path_results": "results/",
     "path_wildcards": "wildcards/",
     "path_settings": "settings/"
