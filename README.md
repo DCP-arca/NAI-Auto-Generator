@@ -30,6 +30,10 @@ https://github.com/neggles/sd-webui-stealth-pnginfo/
 
 https://huggingface.co/baqu2213/
 
+https://github.com/pythongosssss/ComfyUI-WD14-Tagger/
+
+https://huggingface.co/SmilingWolf
+
 
 # 릴리즈
 https://github.com/DCP-arca/NAI-Auto-Generator/releases
