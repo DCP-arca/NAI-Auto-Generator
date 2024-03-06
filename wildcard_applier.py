@@ -2,7 +2,7 @@ import os
 import random
 from enum import Enum
 
-MAX_TRY_AMOUNT = 99
+MAX_TRY_AMOUNT = 10
 
 
 class WildcardApplier():

@@ -25,6 +25,8 @@ TITLE_NAME = "NAI Auto Generator"
 TOP_NAME = "dcp_arca"
 APP_NAME = "nag_gui"
 
+MAX_COUNT_FOR_WHILE = 10
+
 #############################################
 
 
@@ -80,29 +82,38 @@ def strtobool(val):
         raise ValueError("invalid truth value %r" % (val,))
 
 
-def pickedit_lessthan_str(s):
-    edited_str = s
-    pos_prev = 0
-    while True:
-        pos_r = edited_str.find(">", pos_prev + 1)
-        if pos_r == -1:
+def pickedit_lessthan_str(original_str):
+    try_count = 0
+
+    edited_str = original_str
+    while try_count < MAX_COUNT_FOR_WHILE:
+        try_count += 1
+
+        before_edit_str = edited_str
+        pos_prev = 0
+        while True:
+            pos_r = edited_str.find(">", pos_prev + 1)
+            if pos_r == -1:
+                break
+
+            pos_l = edited_str.rfind("<", pos_prev, pos_r)
+            if pos_l != -1:
+                left = edited_str[0:pos_l]
+                center = edited_str[pos_l + 1:pos_r]
+                right = edited_str[pos_r + 1:len(edited_str)]
+
+                center_splited = center.split("|")
+                center_picked = center_splited[random.randrange(
+                    0, len(center_splited))]
+
+                result_left = left + center_picked
+                pos_prev = len(result_left)
+                edited_str = result_left + right
+            else:
+                pos_prev = pos_r
+
+        if before_edit_str == edited_str:
             break
-
-        pos_l = edited_str.rfind("<", pos_prev, pos_r)
-        if pos_l != -1:
-            left = edited_str[0:pos_l]
-            center = edited_str[pos_l + 1:pos_r]
-            right = edited_str[pos_r + 1:len(edited_str)]
-
-            center_splited = center.split("|")
-            center_picked = center_splited[random.randrange(
-                0, len(center_splited))]
-
-            result_left = left + center_picked
-            pos_prev = len(result_left)
-            edited_str = result_left + right
-        else:
-            pos_prev = pos_r
 
     return edited_str
 
@@ -355,14 +366,34 @@ class MyWidget(QMainWindow):
         return data
 
     def _preedit_prompt(self, prompt, nprompt):
-        # lessthan pick
-        prompt = pickedit_lessthan_str(prompt)
-        nprompt = pickedit_lessthan_str(nprompt)
-        # wildcards pick
-        prompt = self.apply_wildcards(prompt)
-        nprompt = self.apply_wildcards(nprompt)
+        try_count = 0
+        edited_prompt = prompt
+        while try_count < MAX_COUNT_FOR_WHILE:
+            try_count += 1
 
-        return prompt, nprompt
+            before_edit_prompt = edited_prompt
+
+            edited_prompt = pickedit_lessthan_str(edited_prompt)
+            edited_prompt = self.apply_wildcards(edited_prompt)
+
+            if before_edit_prompt == edited_prompt:
+                break
+
+        try_count = 0
+        edited_nprompt = nprompt
+        while try_count < MAX_COUNT_FOR_WHILE:
+            try_count += 1
+
+            before_edit_nprompt = edited_nprompt
+            # lessthan pick
+            edited_nprompt = pickedit_lessthan_str(edited_nprompt)
+            # wildcards pick
+            edited_nprompt = self.apply_wildcards(edited_nprompt)
+
+            if before_edit_nprompt == edited_nprompt:
+                break
+
+        return edited_prompt, edited_nprompt
 
     def on_click_generate_once(self):
         data = self._get_data_for_generate()
@@ -758,7 +789,7 @@ class MyWidget(QMainWindow):
                     return
 
             QMessageBox.information(
-                self, '경고', "png, webp, txt 파일만 가능합니다.")
+                self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.\ni2i와 vibe를 사용하고 싶다면 해당 칸에 떨어트려주세요.")
         else:
             self.set_statusbar_text("LOADING")
             try:
