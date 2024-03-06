@@ -1,7 +1,8 @@
 import os
-
-from PyQt5.QtWidgets import QWidget, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+import sys
+from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
+from PyQt5.QtGui import QImage, QPainter
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize
 
 from consts import DEFAULT_PATH
 
@@ -14,6 +15,15 @@ def create_empty(minimum_width=1, minimum_height=1, fixed_height=0):
     if fixed_height != 0:
         w.setFixedHeight(fixed_height)
     return w
+
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path).replace("\\", "/")
 
 
 def strtobool(val):
@@ -32,6 +42,34 @@ def strtobool(val):
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+class BackgroundFrame(QFrame):
+    def __init__(self, parent):
+        super(BackgroundFrame, self).__init__(parent)
+        self.image = QImage()
+
+    def set_background_image(self, image_path):
+        self.image.load(image_path)
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        scaled_image = self.image.scaled(
+            self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+        target_rect = QRectF(
+            (self.width() - scaled_image.width()) / 2,
+            (self.height() - scaled_image.height()) / 2,
+            scaled_image.width(),
+            scaled_image.height())
+        painter.setOpacity(0.5)
+        painter.drawImage(target_rect, scaled_image)
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Resize:
+            self.update()
+            return True
+        return super(BackgroundFrame, self).eventFilter(obj, event)
 
 
 class LoginThread(QThread):
@@ -285,9 +323,8 @@ class OptionDialog(QDialog):
 
         add_item(layout, "path_results", "생성이미지 저장 위치 : ")
         add_item(layout, "path_wildcards", "와일드카드 저장 위치 : ")
-        # add_item(layout, "path_prompts", "프롬프트 저장 위치 : ")
-        # add_item(layout, "path_nprompts", "네거티브 프롬프트 저장 위치 : ")
         add_item(layout, "path_settings", "세팅 파일 저장 위치 : ")
+        add_item(layout, "path_models", "태거 모델 저장 위치 : ")
 
         layout.addWidget(create_empty(minimum_height=6))
 
@@ -333,3 +370,77 @@ class OptionDialog(QDialog):
         self.parent.settings.setValue(
             "will_savename_prompt", self.checkbox_savepname.isChecked())
         self.reject()
+
+
+class LoadingWorker(QThread):
+    finished = pyqtSignal(bool)
+
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def run(self):
+        try:
+            self.finished.emit(self.func())
+        except Exception as e:
+            print(e)
+            self.finished.emit(False)
+
+
+class FileIODialog(QDialog):
+    def __init__(self, text, func):
+        super().__init__()
+        self.text = text
+        self.func = func
+        self.init_ui()
+
+    def init_ui(self):
+        self.setWindowTitle("로딩 중")
+
+        layout = QVBoxLayout()
+        self.progress_label = QLabel(self.text)
+        layout.addWidget(self.progress_label)
+
+        self.setLayout(layout)
+
+        self.resize(200, 100)
+        self.setWindowFlag(Qt.WindowCloseButtonHint, False)
+
+    def showEvent(self, event):
+        self.worker_thread = LoadingWorker(self.func)
+        self.worker_thread.finished.connect(self.on_finished)
+        self.worker_thread.start()
+        super().showEvent(event)
+
+    def on_finished(self, df):
+        self.result = df
+        self.accept()
+
+
+class MiniUtilDialog(QDialog):
+    def __init__(self, parent, mode):
+        super(MiniUtilDialog, self).__init__(parent)
+        self.mode = mode
+        self.setWindowTitle("태거" if self.mode == "tagger" else "인포 게터")
+
+        # 레이아웃 설정
+        layout = QVBoxLayout()
+        frame = BackgroundFrame(self)
+        frame.set_background_image(self.mode + ".png")
+        self.parent().installEventFilter(frame)
+        frame.setFixedSize(QSize(512, 512))
+        layout.addWidget(frame)
+        self.setLayout(layout)
+
+
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+
+    DEBUG_MODE = MiniUtilDialog
+
+    if DEBUG_MODE == MiniUtilDialog:
+        from PyQt5.QtWidgets import QMainWindow
+        qw = QMainWindow()
+        loading_dialog = MiniUtilDialog(qw, "getter")
+        if loading_dialog.exec_() == QDialog.Accepted:
+            print(len(loading_dialog.result))

@@ -20,6 +20,7 @@ from consts import COLOR, S, DEFAULT_VALUE, DEFAULT_PARAMS, DEFAULT_PATH, DEFAUL
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction
 from wildcard_applier import WildcardApplier
+from danbooru_tagger import DanbooruTagger
 
 TITLE_NAME = "NAI Auto Generator"
 TOP_NAME = "dcp_arca"
@@ -155,6 +156,7 @@ class MyWidget(QMainWindow):
 
         self.init_nai()
         self.init_wc()
+        self.init_tagger()
 
     def init_variable(self):
         self.is_expand = False
@@ -241,7 +243,11 @@ class MyWidget(QMainWindow):
 
     def init_wc(self):
         self.wcapplier = WildcardApplier(self.settings.value(
-            "path_wildcards", DEFAULT_PATH["path_wildcards"]))
+            "path_wildcards", os.path.abspath(DEFAULT_PATH["path_wildcards"])))
+
+    def init_tagger(self):
+        self.dtagger = DanbooruTagger(self.settings.value(
+            "path_models", os.path.abspath(DEFAULT_PATH["path_models"])))
 
     def save_data(self):
         data_dict = self.get_data()
@@ -554,8 +560,15 @@ class MyWidget(QMainWindow):
         create_folder_if_not_exists(path)
 
         if code == "path_wildcards":
-            self.wcapplier = WildcardApplier(self.settings.value(
-                "path_wildcards", DEFAULT_PATH["path_wildcards"]))
+            self.init_wc()
+        elif code == "path_models":
+            self.init_tagger()
+
+    def on_click_getter(self):
+        print("getter")
+
+    def on_click_tagger(self):
+        print("tagger")
 
     def on_click_expand(self):
         if self.is_expand:
@@ -696,8 +709,6 @@ class MyWidget(QMainWindow):
             else:
                 if fname.endswith(".png") or fname.endswith(".webp"):
                     self.set_image_as_param(mode, fname)
-                    target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
-                    target_group.set_folder_mode(False)
                 elif os.path.isdir(fname):
                     self.set_imagefolder_as_param(mode, fname)
                 else:
@@ -719,7 +730,7 @@ class MyWidget(QMainWindow):
                 QMessageBox.information(
                     self, '경고', "폴더만 선택 가능합니다.")
 
-    def set_image_as_param(self, mode, src):
+    def _set_image_gui(self, mode, src):
         if mode == "img2img":
             self.i2i_settings_group.set_image(src)
             self.image_options_layout.setStretch(0, 1)
@@ -727,6 +738,12 @@ class MyWidget(QMainWindow):
             self.vibe_settings_group.set_image(src)
             self.image_options_layout.setStretch(1, 1)
         self.image_options_layout.setStretch(2, 0)
+
+    def set_image_as_param(self, mode, src):
+        self.dict_img_batch_target[mode + "_foldersrc"] = ""
+        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
+        target_group.set_folder_mode(False)
+        self._set_image_gui(mode, src)
 
     def set_imagefolder_as_param(self, mode, foldersrc):
         if get_imgcount_from_foldersrc(foldersrc) == 0:
@@ -752,7 +769,7 @@ class MyWidget(QMainWindow):
             sort_order=target_group.get_folder_sort_mode()
         )
 
-        self.set_image_as_param(mode, src)
+        self._set_image_gui(mode, src)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -773,10 +790,8 @@ class MyWidget(QMainWindow):
             if fname.endswith(".png") or fname.endswith(".webp"):
                 if self.i2i_settings_group.geometry().contains(event.pos()):
                     self.set_image_as_param("img2img", fname)
-                    self.i2i_settings_group.set_folder_mode(False)
                 elif self.vibe_settings_group.geometry().contains(event.pos()):
                     self.set_image_as_param("vibe", fname)
-                    self.vibe_settings_group.set_folder_mode(False)
                 else:
                     self.get_image_info_bysrc(fname)
                 return
@@ -886,9 +901,9 @@ class AutoGenerateThread(QThread):
 
                 parent.image_result.set_custom_pixmap(result_str)
 
-                if "image" in parent.nai.parameters and parent.nai.parameters["image"]:
+                if parent.dict_img_batch_target["img2img_foldersrc"]:
                     parent.proceed_image_batch("img2img")
-                if "reference_image" in parent.nai.parameters and parent.nai.parameters["reference_image"]:
+                if parent.dict_img_batch_target["vibe_foldersrc"]:
                     parent.proceed_image_batch("vibe")
             else:
                 if self.ignore_error:

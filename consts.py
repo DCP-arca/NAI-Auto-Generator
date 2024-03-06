@@ -1,4 +1,7 @@
-def prettify_naidict(d):
+def prettify_naidict(nai_dict, additional_dict={}):
+    d = nai_dict
+    ad = additional_dict
+
     content = f"""프롬프트 :
 {d['prompt']}
 
@@ -19,13 +22,23 @@ def prettify_naidict(d):
 
     if d['image']:
         content += f"""\n\nI2I 모드 :
+    target : {ad['image_src']}
     strength : {d['strength']}
     noise : {d['noise']}"""
+        if 'image_tag' in ad and ad['image_tag']:
+            content += f"""
+    i2i tag :
+        {ad['image_tag']}"""
 
     if d['reference_image']:
         content += f"""\n\n바이브 적용중 :
+    target : {ad['reference_image_src']}
     reference_information_extracted : {d['reference_information_extracted']}
     reference_strength : {d['reference_strength']}"""
+        if 'reference_image_tag' in ad and ad['reference_image_tag']:
+            content += f"""
+    vibe tag :
+        {ad['reference_image_tag']}"""
 
     return content
 
@@ -37,7 +50,8 @@ class DEFAULT_VALUE:
 DEFAULT_PATH = {
     "path_results": "results/",
     "path_wildcards": "wildcards/",
-    "path_settings": "settings/"
+    "path_settings": "settings/",
+    "path_models": "models/"
 }
 
 DEFAULT_PARAMS = {

@@ -11,3 +11,5 @@ dist/
 *.spec
 ART_WORK/
 .venv/
+.venv_test/
+models/
