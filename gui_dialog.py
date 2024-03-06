@@ -1,10 +1,34 @@
 import os
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
-from PyQt5.QtGui import QImage, QPainter
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize
+from PyQt5.QtWidgets import QApplication, QTextEdit, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
+from PyQt5.QtGui import QImage, QPainter, QPixmap
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize, pyqtSignal
 
-from consts import DEFAULT_PATH
+from io import BytesIO
+from PIL import Image
+from urllib import request
+
+from consts import DEFAULT_PATH, prettify_naidict
+
+import naiinfo_getter
+
+
+def pil2pixmap(im):
+    if im.mode == "RGB":
+        r, g, b = im.split()
+        im = Image.merge("RGB", (b, g, r))
+    elif im.mode == "RGBA":
+        r, g, b, a = im.split()
+        im = Image.merge("RGBA", (b, g, r, a))
+    elif im.mode == "L":
+        im = im.convert("RGBA")
+    # Bild in RGBA konvertieren, falls nicht bereits passiert
+    im2 = im.convert("RGBA")
+    data = im2.tobytes("raw", "RGBA")
+    qim = QImage(
+        data, im.size[0], im.size[1], QImage.Format_ARGB32)
+    pixmap = QPixmap.fromImage(qim)
+    return pixmap
 
 
 def create_empty(minimum_width=1, minimum_height=1, fixed_height=0):
@@ -45,12 +69,19 @@ def strtobool(val):
 
 
 class BackgroundFrame(QFrame):
-    def __init__(self, parent):
+    clicked = pyqtSignal()
+
+    def __init__(self, parent, opacity):
         super(BackgroundFrame, self).__init__(parent)
         self.image = QImage()
+        self.opacity = opacity
 
-    def set_background_image(self, image_path):
+    def set_background_image_by_src(self, image_path):
         self.image.load(image_path)
+        self.update()
+
+    def set_background_image_by_img(self, image):
+        self.image = pil2pixmap(image).toImage()
         self.update()
 
     def paintEvent(self, event):
@@ -62,7 +93,7 @@ class BackgroundFrame(QFrame):
             (self.height() - scaled_image.height()) / 2,
             scaled_image.width(),
             scaled_image.height())
-        painter.setOpacity(0.5)
+        painter.setOpacity(self.opacity)
         painter.drawImage(target_rect, scaled_image)
 
     def eventFilter(self, obj, event):
@@ -70,6 +101,9 @@ class BackgroundFrame(QFrame):
             self.update()
             return True
         return super(BackgroundFrame, self).eventFilter(obj, event)
+
+    def mousePressEvent(self, ev):
+        self.clicked.emit()
 
 
 class LoginThread(QThread):
@@ -421,16 +455,146 @@ class MiniUtilDialog(QDialog):
     def __init__(self, parent, mode):
         super(MiniUtilDialog, self).__init__(parent)
         self.mode = mode
-        self.setWindowTitle("태거" if self.mode == "tagger" else "인포 게터")
+        self.setAcceptDrops(True)
+        self.setWindowTitle("태그 확인하기" if self.mode ==
+                            "tagger" else "이미지 정보 확인하기")
 
         # 레이아웃 설정
         layout = QVBoxLayout()
-        frame = BackgroundFrame(self)
-        frame.set_background_image(self.mode + ".png")
+        frame = BackgroundFrame(self, opacity=0.3)
+        frame.set_background_image_by_src(self.mode + ".png")
+        self.frame = frame
         self.parent().installEventFilter(frame)
         frame.setFixedSize(QSize(512, 512))
+        frame.setStyleSheet("""QLabel{
+            font-size:30px;
+            }
+            QTextEdit{
+            background-color:#00000000;
+            }""")
+
+        inner_layout = QVBoxLayout()
+        label1 = QLabel("Click Me")
+        label1.setAlignment(Qt.AlignCenter)
+        inner_layout.addWidget(label1)
+        label_content = QTextEdit("")
+        label_content.setFrameStyle(QFrame.NoFrame)
+        label_content.setReadOnly(True)
+        label_content.setAcceptRichText(False)
+        label_content.setAlignment(Qt.AlignCenter)
+        label_content.setEnabled(False)
+        inner_layout.addWidget(label_content, stretch=999)
+        label2 = QLabel("Or Drag-Drop Here")
+        label2.setAlignment(Qt.AlignCenter)
+        inner_layout.addWidget(label2)
+        frame.setLayout(inner_layout)
+
+        frame.clicked.connect(self.show_file_dialog)
+
+        self.label_content = label_content
+        self.label1 = label1
+        self.label2 = label2
+
         layout.addWidget(frame)
         self.setLayout(layout)
+
+    def set_content(self, src, nai_dict):
+        if isinstance(src, str) and os.path.isfile(src):
+            self.frame.set_background_image_by_src(src)
+        else:
+            self.frame.set_background_image_by_img(src)
+        self.frame.opacity = 0.1
+        self.label1.setVisible(False)
+        self.label2.setVisible(False)
+        self.label_content.setEnabled(True)
+        self.label_content.setText(nai_dict)
+
+    def execute(self, mode, target):
+        if mode == "src":
+            nai_dict, error_code = naiinfo_getter.get_naidict_from_file(target)
+        elif mode == "img":
+            nai_dict, error_code = naiinfo_getter.get_naidict_from_img(target)
+        elif mode == "txt":
+            nai_dict, error_code = naiinfo_getter.get_naidict_from_txt(target)
+
+        if nai_dict:
+            target_dict = {
+                "prompt": nai_dict["prompt"],
+                "negative_prompt": nai_dict["negative_prompt"]
+            }
+            target_dict.update(nai_dict["option"])
+            target_dict.update(nai_dict["etc"])
+
+            self.set_content(target, prettify_naidict(target_dict))
+
+            return
+
+        QMessageBox.information(
+            self, '경고', "불러오는 중에 오류가 발생했습니다.")
+
+    def show_file_dialog(self):
+        select_dialog = QFileDialog()
+        select_dialog.setFileMode(QFileDialog.ExistingFile)
+        fname, _ = select_dialog.getOpenFileName(
+            self, '불러올 파일을 선택해 주세요.', '',
+            '이미지 파일(*.png *.webp)' if self.mode == "tagger" else
+            '이미지, 텍스트 파일(*.txt *.png *.webp)')
+
+        if fname:
+            if self.mode == "tagger":
+                if fname.endswith(".png") or fname.endswith(".webp"):
+                    self.execute("src", fname)
+                else:
+                    QMessageBox.information(
+                        self, '경고', "png, webp, txt 파일만 가능합니다.")
+                    return
+            else:
+                if fname.endswith(".png") or fname.endswith(".webp"):
+                    self.execute("src", fname)
+                elif fname.endswith(".txt"):
+                    self.execute("txt", fname)
+                else:
+                    QMessageBox.information(
+                        self, '경고', "png, webp 또는 폴더만 가능합니다.")
+                    return
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        files = [u for u in event.mimeData().urls()]
+
+        if len(files) != 1:
+            QMessageBox.information(self, '경고', "파일을 하나만 옮겨주세요.")
+            return
+
+        furl = files[0]
+        if furl.isLocalFile():
+            fname = furl.toLocalFile()
+            if fname.endswith(".png") or fname.endswith(".webp"):
+                self.execute("src", fname)
+                return
+            elif fname.endswith(".txt"):
+                self.execute("txt", fname)
+                return
+
+            QMessageBox.information(
+                self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.")
+        else:
+            try:
+                url = furl.url()
+                res = request.urlopen(url).read()
+                img = Image.open(BytesIO(res))
+                if img:
+                    self.execute("img", img)
+
+            except Exception as e:
+                print(e)
+                QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")
+                return
 
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ def prettify_naidict(nai_dict, additional_dict={}):
     sm : {d['sm']}
     sm_dyn : {d['sm_dyn']}"""
 
-    if d['image']:
+    if 'image' in d and d['image']:
         content += f"""\n\nI2I 모드 :
     target : {ad['image_src']}
     strength : {d['strength']}
@@ -30,7 +30,7 @@ def prettify_naidict(nai_dict, additional_dict={}):
     i2i tag :
         {ad['image_tag']}"""
 
-    if d['reference_image']:
+    if 'reference_image' in d and d['reference_image']:
         content += f"""\n\n바이브 적용중 :
     target : {ad['reference_image_src']}
     reference_information_extracted : {d['reference_information_extracted']}
