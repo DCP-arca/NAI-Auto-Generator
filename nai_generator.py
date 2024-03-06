@@ -3,10 +3,19 @@ import argon2
 from base64 import urlsafe_b64encode
 import requests
 import random
+import zipfile
 import json
+import io
 from enum import Enum
+from PIL import Image
+import base64
 
 BASE_URL = "https://api.novelai.net"
+
+
+class NAIAction(Enum):
+    generate = "generate",
+    img2img = "img2img"
 
 
 class NAIParam(Enum):
@@ -24,7 +33,13 @@ class NAIParam(Enum):
     seed = 12
     extra_noise_seed = 13
     scale = 14
-    uncond_scale = 15
+    uncond_scale = 15,
+    reference_image = 16,
+    reference_information_extracted = 17,
+    reference_strength = 18,
+    image = 19,
+    noise = 20,
+    strength = 21,
 
 
 TYPE_NAIPARAM_DICT = {
@@ -42,7 +57,13 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.seed: int,
     NAIParam.extra_noise_seed: int,
     NAIParam.scale: float,
-    NAIParam.uncond_scale: float
+    NAIParam.uncond_scale: float,
+    NAIParam.reference_image: str,
+    NAIParam.reference_information_extracted: float,
+    NAIParam.reference_strength: float,
+    NAIParam.image: str,
+    NAIParam.noise: float,
+    NAIParam.strength: float
 }
 
 
@@ -91,6 +112,12 @@ class NAIGenerator():
             "add_original_image": False,
             "cfg_rescale": 0,
             "noise_schedule": "native",
+            "image": None,
+            "noise": 0.0,
+            "strength": 0.7,
+            "reference_image": None,
+            "reference_information_extracted": 1.0,
+            "reference_strength": 0.6
         }
 
     def try_login(self, username, password):
@@ -145,7 +172,9 @@ class NAIGenerator():
 
         return None
 
-    def generate_image(self):
+    def generate_image(self, action: NAIAction):
+        assert(isinstance(action, NAIAction))
+
         if self.parameters["extra_noise_seed"] == -1:
             self.parameters["extra_noise_seed"] = self.parameters["seed"]
 
@@ -153,7 +182,7 @@ class NAIGenerator():
         data = {
             "input": self.parameters["prompt"],
             "model": "nai-diffusion-3",
-            "action": "generate",
+            "action": action.name,
             "parameters": self.parameters,
         }
         headers = {"Authorization": f"Bearer " + self.access_token}
@@ -167,9 +196,19 @@ class NAIGenerator():
         return None
 
     def check_logged_in(self):
-        access_result = requests.get("https://api.novelai.net/user/information", headers={
-                                     "Authorization": f"Bearer {self.access_token}"}, timeout=5)
+        access_result = None
+        try:
+            access_result = requests.get("https://api.novelai.net/user/information", headers={
+                                         "Authorization": f"Bearer {self.access_token}"}, timeout=5)
+        except Exception as e:
+            print(e)
         return (access_result is not None)
+
+    def convert_src_to_imagedata(self, img_path, quality=100):
+        img = Image.open(img_path)
+        buf = io.BytesIO()
+        img.save(buf, format='png', quality=100)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 if __name__ == "__main__":
@@ -182,19 +221,28 @@ if __name__ == "__main__":
 
     if is_login_success:
         print(naiG.get_anlas())
-        # naiG.set_param_dict({
-        #     "prompt": "1girl",
-        #     "negative_prompt": "bad quality",
-        #     "width": 512,
-        #     "height": 512,
-        #     "steps": 28,
-        #     "current_sampler": "k_euler_ancestral",
-        #     "cfg_scale": 5,
-        #     "cfg_rescale": 0.0,
-        #     "sm": True,
-        #     "sm_dyn": True
-        # })
 
-        # img = naiG.generate_image()
+        naiG.set_param_dict({
+            "prompt": "1girl",
+            "negative_prompt": "bad quality",
+            "width": 512,
+            "height": 512,
+            "steps": 28,
+            "current_sampler": "k_euler_ancestral",
+            "cfg_scale": 5.0,
+            "cfg_rescale": 0.0,
+            "sm": True,
+            "sm_dyn": True,
+            # "image": get_img_base64("test.png"),
+            # "strength": 0.5,
+            # "noise": 0.0,
+            # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
+        })
 
-        # print(img)
+        img = naiG.generate_image(action=NAIAction.generate)
+        # img = naiG.generate_image(action=NAIAction.img2im)
+
+        zipped = zipfile.ZipFile(io.BytesIO(img))
+        image_bytes = zipped.read(zipped.infolist()[0])
+        img = Image.open(io.BytesIO(image_bytes))
+        img.save("asd.png")

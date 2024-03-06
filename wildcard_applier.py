@@ -92,9 +92,8 @@ class WildcardApplier():
 
 
 if __name__ == "__main__":
-    wa = WildcardApplier("src_wildcards_folder")
+    wa = WildcardApplier("wildcards")
 
-    result = wa.apply_wildcards(
-        "prompt __wildcard1__ __folder/wildcard2__ prompt")
+    # result = wa.apply_wildcards("")
 
-    print(result)
+    # print(result)

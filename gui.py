@@ -1,7 +1,6 @@
 import json
 import sys
 import os
-import shutil
 import io
 import zipfile
 import time
@@ -11,16 +10,15 @@ from io import BytesIO
 from PIL import Image
 from urllib import request
 
-
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
-from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QRect
 from gui_init import init_main_widget
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, TextSaveDialog, TextLoadDialog
 
-from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY
+from consts import COLOR, S, DEFAULT_VALUE, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY
 
 import naiinfo_getter
-from nai_generator import NAIGenerator
+from nai_generator import NAIGenerator, NAIAction
 from wildcard_applier import WildcardApplier
 
 TITLE_NAME = "NAI Auto Generator"
@@ -37,6 +35,35 @@ def create_folder_if_not_exists(folder_path):
 
 def prettify_dict(d):
     return json.dumps(d, sort_keys=True, indent=4)
+
+
+def prettify_naidict(d):
+    content = f"""프롬프트 : {d['prompt']}
+
+네거티브 프롬프트 : {d['negative_prompt']}
+
+이미지 크기 : 가로 {d['width']}, 세로 {d['height']}
+
+옵션들 :
+    scale : {d['scale']}
+    sampler : {d['sampler']}
+    seed : {d['seed']}
+    cfg_rescale : {d['cfg_rescale']}
+    uncond_scale : {d['uncond_scale']}
+    sm : {d['sm']}
+    sm_dyn : {d['sm_dyn']}"""
+
+    if d['image']:
+        content += f"""\n\nI2I 모드 :
+    strength : {d['strength']}
+    noise : {d['noise']}"""
+
+    if d['reference_image']:
+        content += f"""\n\n바이브 적용중 :
+    reference_information_extracted : {d['reference_information_extracted']}
+    reference_strength : {d['reference_strength']}"""
+
+    return content
 
 
 def strtobool(val):
@@ -88,7 +115,7 @@ def create_windows_filepath(base_path, filename, extension, max_length=150):
     # 파일 이름으로 사용할 수 없는 문자 제거
     cleaned_filename = filename.replace("\n", "")
     cleaned_filename = cleaned_filename.replace("\\", "")
-    
+
     invalid_chars = r'<>:"/\|?*'
     cleaned_filename = ''.join(
         char for char in cleaned_filename if char not in invalid_chars)
@@ -144,7 +171,7 @@ class MyWidget(QMainWindow):
     def init_menubar(self):
         openAction = QAction('파일 열기(Open file)', self)
         openAction.setShortcut('Ctrl+O')
-        openAction.triggered.connect(self.show_file_dialog)
+        openAction.triggered.connect(lambda: self.show_file_dialog("file"))
 
         loginAction = QAction('로그인(Log in)', self)
         loginAction.setShortcut('Ctrl+L')
@@ -221,9 +248,13 @@ class MyWidget(QMainWindow):
         dict_ui["sampler"].setCurrentText(data_dict["sampler"])
 
         list_ui_using_settext = ["prompt", "negative_prompt", "width", "height",
-                                 "steps", "seed", "scale", "uncond_scale", "cfg_rescale"]
+                                 "steps", "seed", "scale", "uncond_scale", "cfg_rescale",
+                                 "strength", "noise", "reference_information_extracted", "reference_strength"]
         for key in list_ui_using_settext:
-            dict_ui[key].setText(str(data_dict[key]))
+            if key in data_dict:
+                dict_ui[key].setText(str(data_dict[key]))
+            else:
+                print(key)
 
         list_ui_using_setchecked = ["sm", "sm_dyn"]
         for key in list_ui_using_setchecked:
@@ -258,7 +289,11 @@ class MyWidget(QMainWindow):
             "cfg_rescale": self.dict_ui_settings["cfg_rescale"].text(),
             "sm": str(self.dict_ui_settings["sm"].isChecked()),
             "sm_dyn": str(self.dict_ui_settings["sm_dyn"].isChecked()),
-            "uncond_scale": str(float(self.dict_ui_settings["uncond_scale"].text()) / 100)
+            "uncond_scale": str(float(self.dict_ui_settings["uncond_scale"].text()) / 100),
+            "strength": self.dict_ui_settings["strength"].text(),
+            "noise": self.dict_ui_settings["noise"].text(),
+            "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
+            "reference_strength": self.dict_ui_settings["reference_strength"].text(),
         }
 
         if do_convert_type:
@@ -271,6 +306,11 @@ class MyWidget(QMainWindow):
             data["sm"] = strtobool(data["sm"])
             data["sm_dyn"] = strtobool(data["sm_dyn"])
             data["uncond_scale"] = float(data["uncond_scale"])
+            data["strength"] = float(data["strength"])
+            data["noise"] = float(data["noise"])
+            data["reference_information_extracted"] = float(
+                data["reference_information_extracted"])
+            data["reference_strength"] = float(data["reference_strength"])
 
         return data
 
@@ -299,6 +339,16 @@ class MyWidget(QMainWindow):
                 width, height = res_text.split("x")
                 data["width"], data["height"] = int(width), int(height)
 
+        # image option check
+        data["image"] = None
+        data["reference_image"] = None
+        if self.i2i_settings_group.src:
+            data["image"] = self.nai.convert_src_to_imagedata(
+                self.i2i_settings_group.src)
+        if self.vibe_settings_group.src:
+            data["reference_image"] = self.nai.convert_src_to_imagedata(
+                self.vibe_settings_group.src)
+
         return data
 
     def _preedit_prompt(self, prompt, nprompt):
@@ -312,7 +362,9 @@ class MyWidget(QMainWindow):
         return prompt, nprompt
 
     def on_click_generate_once(self):
-        self.nai.set_param_dict(self._get_data_for_generate())
+        data = self._get_data_for_generate()
+        self.nai.set_param_dict(data)
+        self.prompt_result.setText(prettify_naidict(data))
 
         generate_thread = GenerateThread(self)
         generate_thread.generate_result.connect(self._on_result_generate)
@@ -437,6 +489,7 @@ class MyWidget(QMainWindow):
         path = self.settings.value(target_path, DEFAULT_PATH[target_path])
         path = os.path.abspath(path)
 
+        print(mode)
         if mode == "add" or mode == "set":
             str_title = '추가하기' if mode == "add" else "덮어쓰기"
             d = TextLoadDialog(self, path, str_title)
@@ -457,25 +510,24 @@ class MyWidget(QMainWindow):
                     QMessageBox.information(
                         self, '경고', str_warning + "\n\n" + str(e))
         elif mode == "sav":
-            d = TextSaveDialog(self, path, "저장하기")
-            if d.exec_() == QDialog.Accepted:
-                path = os.path.join(path, d.filename + ".txt")
-
+            file_path, _ = QFileDialog.getSaveFileName(
+                self, "파일을 저장할 곳을 선택해주세요", "", "Txt File (*.txt)")
+            if file_path:
                 try:
-                    with open(path, "w", encoding="utf8") as f:
+                    with open(file_path, "w", encoding="utf8") as f:
                         f.write(target_textedit.toPlainText())
                 except Exception as e:
                     print(e)
                     QMessageBox.information(
                         self, '경고', "저장에 실패했습니다.\n\n" + str(e))
 
-    def on_click_preview_wildcard(self):
-        prompt = self.dict_ui_settings["prompt"].toPlainText()
-        nprompt = self.dict_ui_settings["negative_prompt"].toPlainText()
+    # def on_click_preview_wildcard(self):
+    #     prompt = self.dict_ui_settings["prompt"].toPlainText()
+    #     nprompt = self.dict_ui_settings["negative_prompt"].toPlainText()
 
-        wc_prompt, wc_nprompt = self._preedit_prompt(prompt, nprompt)
+    #     wc_prompt, wc_nprompt = self._preedit_prompt(prompt, nprompt)
 
-        self.show_prompt_dialog("미리 뽑아 보기", wc_prompt, wc_nprompt)
+    #     self.show_prompt_dialog("미리 뽑아 보기", wc_prompt, wc_nprompt)
 
     def show_prompt_dialog(self, title, prompt, nprompt):
         QMessageBox.about(self, title,
@@ -642,7 +694,7 @@ class MyWidget(QMainWindow):
 
         self.set_auto_login(False)
 
-    def show_file_dialog(self):
+    def show_file_dialog(self, mode):
         select_dialog = QFileDialog()
         select_dialog.setFileMode(QFileDialog.ExistingFile)
         fname = select_dialog.getOpenFileName(
@@ -650,14 +702,34 @@ class MyWidget(QMainWindow):
 
         if fname[0]:
             fname = fname[0]
-            if fname.endswith(".png") or fname.endswith(".webp"):
-                self.get_image_info_bysrc(fname)
-            elif fname.endswith(".txt"):
-                self.get_image_info_bytxt(fname)
+
+            if mode == "file":
+                if fname.endswith(".png") or fname.endswith(".webp"):
+                    self.get_image_info_bysrc(fname)
+                elif fname.endswith(".txt"):
+                    self.get_image_info_bytxt(fname)
+                else:
+                    QMessageBox.information(
+                        self, '경고', "png, webp, txt 파일만 가능합니다.")
+                    return
             else:
-                QMessageBox.information(
-                    self, '경고', "png, webp, txt 파일만 가능합니다.")
-                return
+                if fname.endswith(".png") or fname.endswith(".webp"):
+                    self.set_image_as_param(mode, fname)
+                else:
+                    QMessageBox.information(
+                        self, '경고', "png, webp 파일만 가능합니다.")
+                    return
+
+    def set_image_as_param(self, mode, src):
+        if mode == "i2i":
+            self.i2i_settings_group.set_image(src)
+            self.i2i_settings_group.set_folder_mode(False)
+            self.image_options_layout.setStretch(0, 1)
+        if mode == "vibe":
+            self.vibe_settings_group.set_image(src)
+            self.i2i_settings_group.set_folder_mode(False)
+            self.image_options_layout.setStretch(1, 1)
+        self.image_options_layout.setStretch(2, 0)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -676,7 +748,12 @@ class MyWidget(QMainWindow):
         if furl.isLocalFile():
             fname = furl.toLocalFile()
             if fname.endswith(".png") or fname.endswith(".webp"):
-                self.get_image_info_bysrc(fname)
+                if self.i2i_settings_group.geometry().contains(event.pos()):
+                    self.set_image_as_param("i2i", fname)
+                elif self.vibe_settings_group.geometry().contains(event.pos()):
+                    self.set_image_as_param("vibe", fname)
+                else:
+                    self.get_image_info_bysrc(fname)
             elif fname.endswith(".txt"):
                 self.get_image_info_bytxt(fname)
             else:
@@ -756,6 +833,7 @@ class AutoGenerateThread(QThread):
             if not temp_preserve_data_once:
                 data = parent._get_data_for_generate()
                 parent.nai.set_param_dict(data)
+                parent.prompt_result.setText(prettify_naidict(data))
             temp_preserve_data_once = False
 
             # set status bar
@@ -778,7 +856,7 @@ class AutoGenerateThread(QThread):
                 parent.last_parameter = data
             else:
                 if self.ignore_error:
-                    for t in range(5, 0, -1):
+                    for t in range(DEFAULT_VALUE.AMOUNT_WAIT_WHEN_ERROR_OCCUR, 0, -1):
                         parent.set_statusbar_text("AUTO_ERROR_WAIT", [t])
                         time.sleep(1)
                         if self.is_dead:
@@ -811,7 +889,8 @@ class AutoGenerateThread(QThread):
 def _threadfunc_generate_image(thread_self):
     # 1 : get image
     nai = thread_self.parent().nai
-    data = nai.generate_image()
+    data = nai.generate_image(NAIAction.img2img
+                              if nai.parameters["image"] else NAIAction.generate)
     if not data:
         return 1, "서버에서 정보를 가져오는데 실패했습니다."
 
@@ -882,6 +961,20 @@ class AnlasThread(QThread):
 if __name__ == '__main__':
     input_list = sys.argv
     app = QApplication(sys.argv)
+
+    MAIN_COLOR = {
+        # Font
+        "font-size": '20px',
+        "primaryColor": '#009688',
+        "primaryLightColor": '#52c7b8',
+        "secondaryColor": '#f5f5f5',
+        "secondaryLightColor": '#ffffff',
+        "secondaryDarkColor": '#E6E6E6',
+        "primaryTextColor": '#000000',
+        "secondaryTextColor": '#000000'
+    }
+    # apply_stylesheet(app, theme='light_teal_500.xml',
+    #                  invert_secondary=True, extra=MAIN_COLOR)
     widget = MyWidget(app)
 
     time.sleep(0.1)

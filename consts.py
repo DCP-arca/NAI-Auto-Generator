@@ -1,3 +1,7 @@
+class DEFAULT_VALUE:
+    AMOUNT_WAIT_WHEN_ERROR_OCCUR = 1
+
+
 DEFAULT_PATH = {
     "path_prompts": "prompts/",
     "path_nprompts": "negative_prompts/",
@@ -19,7 +23,11 @@ DEFAULT_PARAMS = {
     "sm_dyn": True,
     "scale": 5,
     "cfg_rescale": 0,
-    "uncond_scale": 1.0
+    "uncond_scale": 1.0,
+    "strength": 0.7,
+    "noise": 0.0,
+    "reference_information_extracted": 1.0,
+    "reference_strength": 0.6,
 }
 
 DEFAULT_SETTING = {'prompt': '1girl, {aris_{{blue_archive}}}, {Character:Tendou Aris{{Blue Archive}}}, {{{chibi}}}, ?, question mark, {grab a pencil}, white eyes, white background, simple background, {looking at viewer}, oversimplified, {{icon}}, best quality, amazing quality, very aesthetic, absurdres', 'negative_prompt':
