@@ -206,10 +206,13 @@ class NAIGenerator():
         return (access_result is not None)
 
     def convert_src_to_imagedata(self, img_path, quality=100):
-        img = Image.open(img_path)
-        buf = io.BytesIO()
-        img.save(buf, format='png', quality=100)
-        return base64.b64encode(buf.getvalue()).decode("utf-8")
+        try:
+            img = Image.open(img_path)
+            buf = io.BytesIO()
+            img.save(buf, format='png', quality=100)
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+        except Exception as e:
+            return ""
 
 
 if __name__ == "__main__":

@@ -373,11 +373,20 @@ class MyWidget(QMainWindow):
         data["image"] = None
         data["reference_image"] = None
         if self.i2i_settings_group.src:
-            data["image"] = self.nai.convert_src_to_imagedata(
+            imgdata_i2i = self.nai.convert_src_to_imagedata(
                 self.i2i_settings_group.src)
+            if imgdata_i2i:
+                data["image"] = imgdata_i2i
+            else:
+                self.i2i_settings_group.on_click_removebutton()
         if self.vibe_settings_group.src:
-            data["reference_image"] = self.nai.convert_src_to_imagedata(
+            imgdata_vibe = self.nai.convert_src_to_imagedata(
                 self.vibe_settings_group.src)
+            if imgdata_vibe:
+                data["reference_image"] = imgdata_vibe
+            else:
+                self.vibe_settings_group.on_click_removebutton()
+
 
         return data
 
