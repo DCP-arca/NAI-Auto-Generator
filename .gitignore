@@ -7,6 +7,9 @@ __pycache__/
 _example_cursor.py
 build/
 dist/
+dist_release_zip/
+dist_onefile/
+folder_for_release/
 *.spec
 ART_WORK/
 .venv/

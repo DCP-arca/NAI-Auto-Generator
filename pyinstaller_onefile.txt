@@ -1,3 +1,0 @@
-
-
-pyinstaller --onefile --noconfirm --windowed --icon "D:/Dev/Workspace/Python/NAI-Auto-Generator/icon.ico" --name "NAI Auto Generator" --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/no_image.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/open_image.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/open_folder.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/getter.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/tagger.png;."  "D:/Dev/Workspace/Python/NAI-Auto-Generator/gui.py"
