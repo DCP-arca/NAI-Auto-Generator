@@ -24,19 +24,23 @@ def prettify_naidict(nai_dict, additional_dict={}):
         content += "\n\nI2I 모드 :\n" + (f"    target : {ad['image_src']}\n" if (
             'image_src' in ad and ad['image_src']) else '') + f"""    strength : {d['strength']}
     noise : {d['noise']}"""
-        if 'image_tag' in ad and ad['image_tag']:
-            content += f"""
-    i2i tag :
-        {ad['image_tag']}"""
 
     if 'reference_image' in d and d['reference_image']:
         content += "\n\n바이브 트랜스퍼 :\n" + (f"    target : {ad['reference_image_src']}\n" if (
             'reference_image_src' in ad and ad['reference_image_src']) else '') + f"""    reference_information_extracted : {d['reference_information_extracted']}
     reference_strength : {d['reference_strength']}"""
+
+
+    if 'image' in d and d['image']:
+        if 'image_tag' in ad and ad['image_tag']:
+            content += f"""\n
+@@img2img@@ tag :
+    {ad['image_tag']}"""
+    if 'reference_image' in d and d['reference_image']:
         if 'reference_image_tag' in ad and ad['reference_image_tag']:
-            content += f"""
-    vibe tag :
-        {ad['reference_image_tag']}"""
+            content += f"""\n
+@@vibe@@ tag :
+    {ad['reference_image_tag']}"""
 
     return content
 

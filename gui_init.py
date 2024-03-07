@@ -678,7 +678,7 @@ def init_paramater_options_layout(self):
 
 def init_image_options_layout(self):
     class ImageSettingGroup(QGroupBox):
-        def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder):
+        def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder, func_tag_check):
             super(ImageSettingGroup, self).__init__(title)
             self.setAcceptDrops(True)
 
@@ -788,6 +788,20 @@ def init_image_options_layout(self):
             after_layout.addLayout(target_layout, stretch=1)
             after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
 
+            # tagcheck_layout
+            tagcheck_layout = QHBoxLayout() 
+            tagcheck_layout.addStretch(999)
+
+            tagcheck_checkbox = QCheckBox("이미지 태그 자동 추가: ")
+            tagcheck_checkbox.setLayoutDirection(Qt.RightToLeft) 
+            tagcheck_checkbox.setStyleSheet("background-color:#00000000")
+            tagcheck_checkbox.clicked.connect(func_tag_check)
+            tagcheck_layout.addWidget(tagcheck_checkbox, stretch=1)
+
+            after_layout.addLayout(tagcheck_layout, stretch=1)
+            after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
+
+            self.tagcheck_checkbox = tagcheck_checkbox
             self.target_remove_button = target_remove_button
             self.folder_label = folder_label
             self.before_frame = before_frame
@@ -855,7 +869,8 @@ def init_image_options_layout(self):
             gui_nobackground=True
         ),
         func_open_img=lambda: self.show_file_dialog("img2img"),
-        func_open_folder=lambda: self.show_openfolder_dialog("img2img")
+        func_open_folder=lambda: self.show_openfolder_dialog("img2img"),
+        func_tag_check=lambda: self.on_click_tagcheckbox("img2img")
     )
 
     def i2i_on_click_removebutton():
@@ -891,7 +906,8 @@ def init_image_options_layout(self):
             gui_nobackground=True
         ),
         func_open_img=lambda: self.show_file_dialog("vibe"),
-        func_open_folder=lambda: self.show_openfolder_dialog("vibe")
+        func_open_folder=lambda: self.show_openfolder_dialog("vibe"),
+        func_tag_check=lambda: self.on_click_tagcheckbox("vibe")
     )
 
     def vibe_on_click_removebutton():

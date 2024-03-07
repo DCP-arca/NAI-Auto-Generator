@@ -167,8 +167,11 @@ class MyWidget(QMainWindow):
             "img2img_index": -1,
             "vibe_foldersrc": "",
             "vibe_index": -1
-
         }
+        self.i2i_last_generated_target = ""
+        self.i2i_last_generated_result = ""
+        self.vibe_last_generated_target = ""
+        self.vibe_last_generated_result = ""
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
@@ -387,6 +390,36 @@ class MyWidget(QMainWindow):
             else:
                 self.vibe_settings_group.on_click_removebutton()
 
+        # image tag check
+        if self.i2i_settings_group.tagcheck_checkbox.isChecked():
+            if self.i2i_settings_group.src:
+                if self.i2i_last_generated_target != self.i2i_settings_group.src:
+                    self.i2i_last_generated_target = self.i2i_settings_group.src
+                    self.i2i_last_generated_result = self.predict_tag_from("src", self.i2i_settings_group.src, False)
+                    if not self.i2i_last_generated_result:
+                        self.i2i_last_generated_target = ""
+                        self.i2i_last_generated_result = ""
+
+                data["prompt"] = data["prompt"].replace("@@img2img@@", self.i2i_last_generated_result)
+                data["negative_prompt"] = data["negative_prompt"].replace("@@img2img@@", self.i2i_last_generated_result)
+        else:
+            self.i2i_last_generated_target = ""
+            self.i2i_last_generated_result = ""
+        if self.vibe_settings_group.tagcheck_checkbox.isChecked():
+            if self.vibe_settings_group.src:
+                if self.vibe_last_generated_target != self.vibe_settings_group.src:
+                    self.vibe_last_generated_target = self.vibe_settings_group.src
+                    self.vibe_last_generated_result = self.predict_tag_from("src", self.vibe_settings_group.src, False)
+                    if not self.vibe_last_generated_result:
+                        self.vibe_last_generated_target = ""
+                        self.vibe_last_generated_result = ""
+
+                data["prompt"] = data["prompt"].replace("@@vibe@@", self.vibe_last_generated_result)
+                data["negative_prompt"] = data["negative_prompt"].replace("@@vibe@@", self.vibe_last_generated_result)
+        else:
+            self.vibe_last_generated_target = ""
+            self.vibe_last_generated_result = ""
+
         return data
 
     def _preedit_prompt(self, prompt, nprompt):
@@ -459,6 +492,8 @@ class MyWidget(QMainWindow):
                     self._on_error_autogenerate)
                 autogenerate_thread.autogenerate_end.connect(
                     self._on_end_autogenerate)
+                autogenerate_thread.autogenerate_result_text_dict.connect(
+                    self.set_result_text)
                 autogenerate_thread.start()
 
                 self.set_autogenerate_mode(True)
@@ -676,8 +711,14 @@ class MyWidget(QMainWindow):
         if 'reference_image' in nai_dict and nai_dict['reference_image']:
             additional_dict["reference_image_src"] = self.vibe_settings_group.src or ""
 
-        QTimer.singleShot(20, lambda: self.prompt_result.setText(
-            prettify_naidict(nai_dict, additional_dict)))
+        if self.i2i_last_generated_result:
+            additional_dict["image_tag"] = self.i2i_last_generated_result
+        if self.vibe_last_generated_result:
+            additional_dict["reference_image_tag"] = self.vibe_last_generated_result
+
+        content = prettify_naidict(nai_dict, additional_dict)
+
+        self.prompt_result.setText(content)
 
     def refresh_anlas(self):
         anlas_thread = AnlasThread(self)
@@ -806,6 +847,19 @@ class MyWidget(QMainWindow):
 
         self._set_image_gui(mode, src)
 
+    def on_click_tagcheckbox(self, mode):
+        box = self.sender()
+        if box.isChecked():
+            if not self.settings.value("selected_tagger_model", ""):
+                box.setChecked(False)
+                QMessageBox.information(
+                    self, '경고', "먼저 옵션에서 태깅 모델을 다운/선택 해주세요.")
+                return
+
+            QMessageBox.information(
+                self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@"+mode+"@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
+            return
+
     def predict_tag_from(self, filemode, target, with_dialog):
         result = ""
 
@@ -924,6 +978,7 @@ class MyWidget(QMainWindow):
 
 class AutoGenerateThread(QThread):
     autogenerate_error = pyqtSignal(int, str)
+    autogenerate_result_text_dict = pyqtSignal(dict)
     autogenerate_end = pyqtSignal()
 
     def __init__(self, parent, count, delay, ignore_error):
@@ -947,7 +1002,7 @@ class AutoGenerateThread(QThread):
             if not temp_preserve_data_once:
                 data = parent._get_data_for_generate()
                 parent.nai.set_param_dict(data)
-                parent.set_result_text(data)
+                self.autogenerate_result_text_dict.emit(data)
             temp_preserve_data_once = False
 
             # set status bar
