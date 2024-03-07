@@ -540,7 +540,7 @@ class MiniUtilDialog(QDialog):
         # 레이아웃 설정
         layout = QVBoxLayout()
         frame = BackgroundFrame(self, opacity=0.3)
-        frame.set_background_image_by_src(self.mode + ".png")
+        frame.set_background_image_by_src(resource_path(self.mode + ".png"))
         self.frame = frame
         self.parent().installEventFilter(frame)
         frame.setFixedSize(QSize(512, 512))
