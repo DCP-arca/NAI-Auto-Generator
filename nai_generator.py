@@ -10,6 +10,7 @@ from enum import Enum
 from PIL import Image
 import base64
 
+BASE_URL_DEPRE = "https://api.novelai.net"
 BASE_URL = "https://image.novelai.net"
 
 
@@ -127,7 +128,7 @@ class NAIGenerator():
         try:
             # try login
             response = requests.post(
-                f"{BASE_URL}/user/login", json={"key": access_key})
+                f"{BASE_URL_DEPRE}/user/login", json={"key": access_key})
             self.access_token = response.json()["accessToken"]
 
             # if success, save id/pw in
@@ -161,7 +162,7 @@ class NAIGenerator():
 
     def get_anlas(self):
         try:
-            response = requests.get(BASE_URL+"/user/subscription", headers={
+            response = requests.get(BASE_URL_DEPRE + "/user/subscription", headers={
                 "Authorization": f"Bearer {self.access_token}"})
             data_dict = json.loads(response.content)
             trainingStepsLeft = data_dict['trainingStepsLeft']
@@ -200,7 +201,7 @@ class NAIGenerator():
     def check_logged_in(self):
         access_result = None
         try:
-            access_result = requests.get(BASE_URL+"/user/information", headers={
+            access_result = requests.get(BASE_URL_DEPRE + "/user/information", headers={
                                          "Authorization": f"Bearer {self.access_token}"}, timeout=5)
         except Exception as e:
             print(e)
@@ -223,31 +224,33 @@ if __name__ == "__main__":
     naiG = NAIGenerator()
 
     is_login_success = naiG.try_login(username, password)
+    print(is_login_success)
+    print(naiG.check_logged_in())
 
     if is_login_success:
         print(naiG.get_anlas())
 
-        naiG.set_param_dict({
-            "prompt": "1girl",
-            "negative_prompt": "bad quality",
-            "width": 512,
-            "height": 512,
-            "steps": 28,
-            "current_sampler": "k_euler_ancestral",
-            "cfg_scale": 5.0,
-            "cfg_rescale": 0.0,
-            "sm": True,
-            "sm_dyn": True,
-            # "image": get_img_base64("test.png"),
-            # "strength": 0.5,
-            # "noise": 0.0,
-            # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
-        })
+    #     naiG.set_param_dict({
+    #         "prompt": "1girl",
+    #         "negative_prompt": "bad quality",
+    #         "width": 512,
+    #         "height": 512,
+    #         "steps": 28,
+    #         "current_sampler": "k_euler_ancestral",
+    #         "cfg_scale": 5.0,
+    #         "cfg_rescale": 0.0,
+    #         "sm": True,
+    #         "sm_dyn": True,
+    #         # "image": get_img_base64("test.png"),
+    #         # "strength": 0.5,
+    #         # "noise": 0.0,
+    #         # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
+    #     })
 
-        img = naiG.generate_image(action=NAIAction.generate)
-        # img = naiG.generate_image(action=NAIAction.img2im)
+    #     img = naiG.generate_image(action=NAIAction.generate)
+    #     # img = naiG.generate_image(action=NAIAction.img2im)
 
-        zipped = zipfile.ZipFile(io.BytesIO(img))
-        image_bytes = zipped.read(zipped.infolist()[0])
-        img = Image.open(io.BytesIO(image_bytes))
-        img.save("asd.png")
+    #     zipped = zipfile.ZipFile(io.BytesIO(img))
+    #     image_bytes = zipped.read(zipped.infolist()[0])
+    #     img = Image.open(io.BytesIO(image_bytes))
+    #     img.save("asd.png")

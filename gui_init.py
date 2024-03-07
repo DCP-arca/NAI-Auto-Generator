@@ -789,11 +789,11 @@ def init_image_options_layout(self):
             after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
 
             # tagcheck_layout
-            tagcheck_layout = QHBoxLayout() 
+            tagcheck_layout = QHBoxLayout()
             tagcheck_layout.addStretch(999)
 
             tagcheck_checkbox = QCheckBox("이미지 태그 자동 추가: ")
-            tagcheck_checkbox.setLayoutDirection(Qt.RightToLeft) 
+            tagcheck_checkbox.setLayoutDirection(Qt.RightToLeft)
             tagcheck_checkbox.setStyleSheet("background-color:#00000000")
             tagcheck_checkbox.clicked.connect(func_tag_check)
             tagcheck_layout.addWidget(tagcheck_checkbox, stretch=1)
