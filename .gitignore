@@ -5,7 +5,6 @@ prompts/
 negative_prompts/
 __pycache__/
 _example_cursor.py
-pyinstaller.txt
 build/
 dist/
 *.spec

@@ -1,0 +1,9 @@
+cd D:\Dev\Workspace\Python\NAI-Auto-Generator
+
+D:\Dev\Workspace\Python\NAI-Auto-Generator\.venv\Scripts\activate.bat
+
+pyinstaller --noconfirm --onefile --windowed --icon "D:/Dev/Workspace/Python/NAI-Auto-Generator/icon.ico" --name "NAI Auto Generator" --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/no_image.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/open_image.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/open_folder.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/getter.png;." --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/tagger.png;."  "D:/Dev/Workspace/Python/NAI-Auto-Generator/gui.py"
+
+pyinstaller --noconfirm --onefile --windowed --icon "D:/Dev/Workspace/Python/NAI-Auto-Generator/icon_tagger.ico" --name "Tagger" --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/tagger.png;."  "D:/Dev/Workspace/Python/NAI-Auto-Generator/getter_standalone.py"
+
+pyinstaller --noconfirm --onefile --windowed --icon "D:/Dev/Workspace/Python/NAI-Auto-Generator/icon_getter.ico" --name "Info Getter" --add-data "D:/Dev/Workspace/Python/NAI-Auto-Generator/getter.png;." "D:/Dev/Workspace/Python/NAI-Auto-Generator/tagger_standalone.py"
