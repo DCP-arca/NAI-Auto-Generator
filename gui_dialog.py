@@ -1,8 +1,8 @@
 import os
 import sys
-from PyQt5.QtWidgets import QApplication, QTextEdit, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QRadioButton, QTextEdit, QGroupBox, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
 from PyQt5.QtGui import QImage, QPainter, QPixmap
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize, pyqtSignal, QTimer
 
 from io import BytesIO
 from PIL import Image
@@ -11,6 +11,8 @@ from urllib import request
 from consts import DEFAULT_PATH, prettify_naidict
 
 import naiinfo_getter
+
+from danbooru_tagger import DEFAULT_MODEL, LIST_MODEL, DanbooruTagger
 
 
 def pil2pixmap(im):
@@ -66,6 +68,10 @@ def strtobool(val):
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+def get_key_from_dict(dictionary, value):
+    return next((key for key, val in dictionary.items() if val == value), None)
 
 
 class BackgroundFrame(QFrame):
@@ -312,13 +318,12 @@ class GenerateDialog(QDialog):
 
 class OptionDialog(QDialog):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
         self.initUI()
-        super().exec_()
 
     def initUI(self):
-        parent_pos = self.parent.pos()
+        parent = self.parent()
+        parent_pos = parent.pos()
 
         self.setWindowTitle('옵션')
         self.move(parent_pos.x() + 50, parent_pos.y() + 50)
@@ -334,7 +339,7 @@ class OptionDialog(QDialog):
             label_title = QLabel(text)
             hbox_item.addWidget(label_title)
 
-            path = self.parent.settings.value(
+            path = parent.settings.value(
                 code, DEFAULT_PATH[code])
             label_loc = QLabel(os.path.abspath(path))
             label_loc.setStyleSheet("font-size: 14px")
@@ -355,16 +360,63 @@ class OptionDialog(QDialog):
                 lambda: self.on_click_reset_button(code))
             hbox_item.addWidget(button_reset_loc)
 
-        add_item(layout, "path_results", "생성이미지 저장 위치 : ")
-        add_item(layout, "path_wildcards", "와일드카드 저장 위치 : ")
-        add_item(layout, "path_settings", "세팅 파일 저장 위치 : ")
-        add_item(layout, "path_models", "태거 모델 저장 위치 : ")
+        folderloc_group = QGroupBox("폴더 위치")
+        layout.addWidget(folderloc_group)
+
+        folderloc_group_layout = QVBoxLayout()
+        folderloc_group.setLayout(folderloc_group_layout)
+
+        add_item(folderloc_group_layout, "path_results", "생성이미지 저장 위치 : ")
+        add_item(folderloc_group_layout, "path_wildcards", "와일드카드 저장 위치 : ")
+        add_item(folderloc_group_layout, "path_settings", "세팅 파일 저장 위치 : ")
+        add_item(folderloc_group_layout, "path_models", "태거 모델 저장 위치 : ")
+
+        layout.addWidget(create_empty(minimum_height=6))
+
+        groupBox_tagger = QGroupBox("태그 모델 설치 및 선택")
+        self.groupBox_tagger = groupBox_tagger
+        layout.addWidget(groupBox_tagger)
+
+        groupBox_tagger_layout = QVBoxLayout()
+        groupBox_tagger.setLayout(groupBox_tagger_layout)
+
+        list_installed_model = parent.dtagger.get_installed_models()
+        self.dict_tagger_model_radio = {}
+        self.dict_tagger_model_button = {}
+        for index, model_name in enumerate(LIST_MODEL):
+            radio_layout = QHBoxLayout()
+            groupBox_tagger_layout.addLayout(radio_layout)
+
+            radio = QRadioButton(model_name + ("(추천)" if index == 0 else ""))
+            radio.setEnabled(False)
+            radio.clicked.connect(self.on_click_modelradio_button)
+            self.dict_tagger_model_radio[model_name] = radio
+            radio_layout.addWidget(radio)
+
+            download_button = QPushButton("다운로드")
+            download_button.clicked.connect(self.on_click_download_button)
+            self.dict_tagger_model_button[model_name] = download_button
+            radio_layout.addWidget(download_button)
+
+            if model_name + ".onnx" in list_installed_model:
+                radio.setEnabled(True)
+                download_button.setEnabled(False)
+
+        now_selected = parent.settings.value("selected_tagger_model", '')
+        if now_selected and now_selected in list_installed_model:
+            self.dict_tagger_model_radio[now_selected].setChecked(True)
+        else:
+            for k, v in self.dict_tagger_model_radio.items():
+                if v.isEnabled():
+                    v.setChecked(True)
+                    parent.settings.setValue("selected_tagger_model", k)
+                    break
 
         layout.addWidget(create_empty(minimum_height=6))
 
         checkbox_savepname = QCheckBox("파일 생성시 이름에 프롬프트 넣기")
         checkbox_savepname.setChecked(strtobool(
-            self.parent.settings.value("will_savename_prompt", True)))
+            parent.settings.value("will_savename_prompt", True)))
         self.checkbox_savepname = checkbox_savepname
         layout.addWidget(checkbox_savepname)
 
@@ -387,27 +439,43 @@ class OptionDialog(QDialog):
             self, '저장할 위치를 골라주세요.')
 
         if save_loc:
-            self.parent.change_path(code, save_loc)
+            self.parent().change_path(code, save_loc)
 
             self.refresh_label(code)
 
+    def on_click_download_button(self):
+        button = self.sender()
+        model_name = get_key_from_dict(self.dict_tagger_model_button, button)
+
+        self.parent().install_model(model_name)
+
+    def on_click_modelradio_button(self):
+        radio = self.sender()
+        model_name = get_key_from_dict(self.dict_tagger_model_radio, radio)
+
+        self.parent().settings.setValue("selected_tagger_model", model_name)
+
     def on_click_reset_button(self, code):
-        self.parent.change_path(code, DEFAULT_PATH[code])
+        self.parent().change_path(code, DEFAULT_PATH[code])
 
         self.refresh_label(code)
 
+    def on_model_downloaded(self, model_name):
+        self.dict_tagger_model_radio[model_name].setEnabled(True)
+        self.dict_tagger_model_button[model_name].setEnabled(False)
+
     def refresh_label(self, code):
-        path = self.parent.settings.value(code, DEFAULT_PATH[code])
+        path = self.parent().settings.value(code, DEFAULT_PATH[code])
         self.dict_label_loc[code].setText(path)
 
     def on_click_close_button(self):
-        self.parent.settings.setValue(
+        self.parent().settings.setValue(
             "will_savename_prompt", self.checkbox_savepname.isChecked())
         self.reject()
 
 
 class LoadingWorker(QThread):
-    finished = pyqtSignal(bool)
+    finished = pyqtSignal(str)
 
     def __init__(self, func):
         super().__init__()
@@ -418,7 +486,7 @@ class LoadingWorker(QThread):
             self.finished.emit(self.func())
         except Exception as e:
             print(e)
-            self.finished.emit(False)
+            self.finished.emit("")
 
 
 class FileIODialog(QDialog):
@@ -429,7 +497,7 @@ class FileIODialog(QDialog):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle("로딩 중")
+        self.setWindowTitle("작업 중")
 
         layout = QVBoxLayout()
         self.progress_label = QLabel(self.text)
@@ -441,14 +509,24 @@ class FileIODialog(QDialog):
         self.setWindowFlag(Qt.WindowCloseButtonHint, False)
 
     def showEvent(self, event):
+        QTimer.singleShot(100, self.start_work)
+        super().showEvent(event)
+
+    def start_work(self):
         self.worker_thread = LoadingWorker(self.func)
         self.worker_thread.finished.connect(self.on_finished)
         self.worker_thread.start()
-        super().showEvent(event)
 
-    def on_finished(self, df):
-        self.result = df
+    def on_finished(self, result):
+        self.result = result
         self.accept()
+
+
+class DoubleClickableTextEdit(QTextEdit):
+    doubleclicked = pyqtSignal()
+
+    def mouseDoubleClickEvent(self, ev):
+        self.doubleclicked.emit()
 
 
 class MiniUtilDialog(QDialog):
@@ -456,8 +534,8 @@ class MiniUtilDialog(QDialog):
         super(MiniUtilDialog, self).__init__(parent)
         self.mode = mode
         self.setAcceptDrops(True)
-        self.setWindowTitle("태그 확인하기" if self.mode ==
-                            "tagger" else "이미지 정보 확인하기")
+        self.setWindowTitle("태그 확인기" if self.mode ==
+                            "tagger" else "이미지 정보 확인기")
 
         # 레이아웃 설정
         layout = QVBoxLayout()
@@ -470,26 +548,26 @@ class MiniUtilDialog(QDialog):
             font-size:30px;
             }
             QTextEdit{
+            font-size:20px;
             background-color:#00000000;
             }""")
 
         inner_layout = QVBoxLayout()
-        label1 = QLabel("Click Me")
+        label1 = QLabel("Double Click Me")
         label1.setAlignment(Qt.AlignCenter)
         inner_layout.addWidget(label1)
-        label_content = QTextEdit("")
-        label_content.setFrameStyle(QFrame.NoFrame)
+        label_content = DoubleClickableTextEdit("")
         label_content.setReadOnly(True)
         label_content.setAcceptRichText(False)
+        label_content.setFrameStyle(QFrame.NoFrame)
         label_content.setAlignment(Qt.AlignCenter)
-        label_content.setEnabled(False)
         inner_layout.addWidget(label_content, stretch=999)
         label2 = QLabel("Or Drag-Drop Here")
         label2.setAlignment(Qt.AlignCenter)
         inner_layout.addWidget(label2)
         frame.setLayout(inner_layout)
 
-        frame.clicked.connect(self.show_file_dialog)
+        label_content.doubleclicked.connect(self.show_file_dialog)
 
         self.label_content = label_content
         self.label1 = label1
@@ -509,26 +587,49 @@ class MiniUtilDialog(QDialog):
         self.label_content.setEnabled(True)
         self.label_content.setText(nai_dict)
 
-    def execute(self, mode, target):
-        if mode == "src":
-            nai_dict, error_code = naiinfo_getter.get_naidict_from_file(target)
-        elif mode == "img":
-            nai_dict, error_code = naiinfo_getter.get_naidict_from_img(target)
-        elif mode == "txt":
-            nai_dict, error_code = naiinfo_getter.get_naidict_from_txt(target)
+    def execute(self, filemode, target):
+        if self.mode == "getter":
+            if filemode == "src":
+                nai_dict, error_code = naiinfo_getter.get_naidict_from_file(
+                    target)
+            elif filemode == "img":
+                nai_dict, error_code = naiinfo_getter.get_naidict_from_img(
+                    target)
+            elif filemode == "txt":
+                nai_dict, error_code = naiinfo_getter.get_naidict_from_txt(
+                    target)
 
-        if nai_dict:
-            target_dict = {
-                "prompt": nai_dict["prompt"],
-                "negative_prompt": nai_dict["negative_prompt"]
-            }
-            target_dict.update(nai_dict["option"])
-            target_dict.update(nai_dict["etc"])
+            if nai_dict:
+                target_dict = {
+                    "prompt": nai_dict["prompt"],
+                    "negative_prompt": nai_dict["negative_prompt"]
+                }
+                target_dict.update(nai_dict["option"])
+                target_dict.update(nai_dict["etc"])
 
-            self.set_content(target, prettify_naidict(target_dict))
+                import json
+                print(json.dumps(target_dict, sort_keys=True, indent=4))
 
-            return
+                if 'reference_strength' in target_dict:
+                    rs_float = 0.0
+                    try:
+                        rs_float = float(target_dict['reference_strength'])
+                    except Exception as e:
+                        pass
+                    if rs_float > 0:
+                        target_dict["reference_image"] = "True"
+                if "request_type" in target_dict and target_dict["request_type"] == "Img2ImgRequest":
+                    target_dict["image"] = "True"
 
+                self.set_content(target, prettify_naidict(target_dict))
+
+                return
+        elif self.mode == "tagger":
+            result = self.parent().predict_tag_from(filemode, target, True)
+
+            if result:
+                self.set_content(target, result)
+                return
         QMessageBox.information(
             self, '경고', "불러오는 중에 오류가 발생했습니다.")
 
@@ -553,7 +654,6 @@ class MiniUtilDialog(QDialog):
                     self.execute("src", fname)
                 elif fname.endswith(".txt"):
                     self.execute("txt", fname)
-                else:
                     QMessageBox.information(
                         self, '경고', "png, webp 또는 폴더만 가능합니다.")
                     return
@@ -578,11 +678,16 @@ class MiniUtilDialog(QDialog):
                 self.execute("src", fname)
                 return
             elif fname.endswith(".txt"):
-                self.execute("txt", fname)
-                return
+                if self.mode == "getter":
+                    self.execute("txt", fname)
+                    return
 
-            QMessageBox.information(
-                self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.")
+            if self.mode == "getter":
+                QMessageBox.information(
+                    self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.")
+            else:
+                QMessageBox.information(
+                    self, '경고', "태그 불렁오기는 png, webp 파일만 가능합니다.")
         else:
             try:
                 url = furl.url()
@@ -604,7 +709,25 @@ if __name__ == '__main__':
 
     if DEBUG_MODE == MiniUtilDialog:
         from PyQt5.QtWidgets import QMainWindow
+        from PyQt5.QtCore import QSettings
         qw = QMainWindow()
+        qw.move(200, 200)
+        TOP_NAME = "dcp_arca"
+        APP_NAME = "nag_gui"
+        qw.settings = QSettings(TOP_NAME, APP_NAME)
+        qw.dtagger = DanbooruTagger(qw.settings.value(
+            "path_models", os.path.abspath(DEFAULT_PATH["path_models"])))
         loading_dialog = MiniUtilDialog(qw, "getter")
         if loading_dialog.exec_() == QDialog.Accepted:
             print(len(loading_dialog.result))
+    elif DEBUG_MODE == OptionDialog:
+        from PyQt5.QtWidgets import QMainWindow
+        from PyQt5.QtCore import QSettings
+        TOP_NAME = "dcp_arca"
+        APP_NAME = "nag_gui"
+        qw = QMainWindow()
+        qw.move(200, 200)
+        qw.settings = QSettings(TOP_NAME, APP_NAME)
+        qw.dtagger = DanbooruTagger(qw.settings.value(
+            "path_models", os.path.abspath(DEFAULT_PATH["path_models"])))
+        OptionDialog(qw).exec_()

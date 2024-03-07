@@ -8,6 +8,11 @@ import numpy as np
 import requests
 import shutil
 
+DEFAULT_MODEL = "wd-v1-4-moat-tagger-v2"
+LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
+              "wd-v1-4-convnext-tagger-v2", "wd-v1-4-convnext-tagger",
+              "wd-v1-4-convnextv2-tagger-v2", "wd-v1-4-vit-tagger-v2")
+
 
 def download_file(url, dst):
     try:
@@ -42,16 +47,13 @@ class DanbooruTagger():
     def __init__(self, models_dir):
         self.models_dir = models_dir
         self.options = {
-            "model_name": "wd-v1-4-moat-tagger-v2",
+            "model_name": DEFAULT_MODEL,
             "threshold": 0.35,
             "character_threshold": 0.85,
-            "replace_underscore": False,
+            "replace_underscore": True,
             "trailing_comma": False,
             "exclude_tags": ""
         }
-        self.LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
-                           "wd-v1-4-convnext-tagger-v2", "wd-v1-4-convnext-tagger",
-                           "wd-v1-4-convnextv2-tagger-v2", "wd-v1-4-vit-tagger-v2")
 
     def get_installed_models(self):
         create_folder_if_not_exists(self.models_dir)

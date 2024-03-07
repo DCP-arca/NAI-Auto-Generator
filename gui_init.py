@@ -974,18 +974,21 @@ def init_buttons_layout(self):
         background-color:#00000000;
         border: 1px solid white;
     """
-    button_getter = add_button(
-        hbox_expand, "Info", self.on_click_getter)
+    button_getter = QPushButton("Info")
+    hbox_expand.addWidget(button_getter)
+    button_getter.clicked.connect(self.on_click_getter)
     button_getter.setStyleSheet(stylesheet_button)
     button_getter.setFixedSize(QSize(50, 30))
 
-    button_tagger = add_button(
-        hbox_expand, "Tag", self.on_click_tagger)
+    button_tagger = QPushButton("Tag")
+    hbox_expand.addWidget(button_tagger)
+    button_tagger.clicked.connect(self.on_click_tagger)
     button_tagger.setStyleSheet(stylesheet_button)
     button_tagger.setFixedSize(QSize(50, 30))
 
-    button_expand = add_button(
-        hbox_expand, "<<", self.on_click_expand)
+    button_expand = QPushButton("<<")
+    hbox_expand.addWidget(button_expand)
+    button_expand.clicked.connect(self.on_click_expand)
     button_expand.setStyleSheet(stylesheet_button)
     button_expand.setFixedSize(QSize(50, 30))
     self.button_expand = button_expand

@@ -150,7 +150,7 @@ class NAIGenerator():
 
     def set_param_dict(self, param_dict):
         for k, v in param_dict.items():
-            if k and v:
+            if k and (v is not None):
                 try:
                     param_key = NAIParam[k]
                     self.set_param(param_key, v)

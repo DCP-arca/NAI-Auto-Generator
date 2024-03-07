@@ -11,11 +11,11 @@ from PIL import Image
 from urllib import request
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
-from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QRect
+from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer
 from gui_init import init_main_widget
-from gui_dialog import LoginDialog, OptionDialog, GenerateDialog
+from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
 
-from consts import COLOR, S, DEFAULT_VALUE, DEFAULT_PARAMS, DEFAULT_PATH, DEFAULT_SETTING, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict
+from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict
 
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction
@@ -203,15 +203,26 @@ class MyWidget(QMainWindow):
         aboutAction = QAction('만든 이(About)', self)
         aboutAction.triggered.connect(self.show_about_dialog)
 
+        getterAction = QAction('이미지 정보 확인기(Info Getter)', self)
+        getterAction.setShortcut('Ctrl+I')
+        getterAction.triggered.connect(self.on_click_getter)
+
+        taggerAction = QAction('태그 확인기(Danbooru Tagger)', self)
+        taggerAction.setShortcut('Ctrl+T')
+        taggerAction.triggered.connect(self.on_click_tagger)
+
         menubar = self.menuBar()
         menubar.setNativeMenuBar(False)
-        filemenu = menubar.addMenu('&File')
-        filemenu.addAction(openAction)
-        filemenu.addAction(loginAction)
-        filemenu.addAction(optionAction)
-        filemenu.addAction(exitAction)
-        filemenu = menubar.addMenu('&Etc')
-        filemenu.addAction(aboutAction)
+        filemenu_file = menubar.addMenu('&파일(Files)')
+        filemenu_file.addAction(openAction)
+        filemenu_file.addAction(loginAction)
+        filemenu_file.addAction(optionAction)
+        filemenu_file.addAction(exitAction)
+        filemenu_tool = menubar.addMenu('&도구(Tools)')
+        filemenu_tool.addAction(getterAction)
+        filemenu_tool.addAction(taggerAction)
+        filemenu_etc = menubar.addMenu('&기타(Etc)')
+        filemenu_etc.addAction(aboutAction)
 
     def init_content(self):
         widget = init_main_widget(self)
@@ -403,7 +414,7 @@ class MyWidget(QMainWindow):
     def on_click_generate_once(self):
         data = self._get_data_for_generate()
         self.nai.set_param_dict(data)
-        self.prompt_result.setText(prettify_naidict(data))
+        self.set_result_text(data)
 
         generate_thread = GenerateThread(self)
         generate_thread.generate_result.connect(self._on_result_generate)
@@ -422,9 +433,9 @@ class MyWidget(QMainWindow):
         if error_code == 0:
             self.image_result.set_custom_pixmap(result)
 
-            if "image" in self.nai.parameters and self.nai.parameters["image"]:
+            if self.dict_img_batch_target["img2img_foldersrc"]:
                 self.proceed_image_batch("img2img")
-            if "reference_image" in self.nai.parameters and self.nai.parameters["reference_image"]:
+            if self.dict_img_batch_target["vibe_foldersrc"]:
                 self.proceed_image_batch("vibe")
         else:
             QMessageBox.information(
@@ -565,10 +576,10 @@ class MyWidget(QMainWindow):
             self.init_tagger()
 
     def on_click_getter(self):
-        print("getter")
+        MiniUtilDialog(self, "getter").show()
 
     def on_click_tagger(self):
-        print("tagger")
+        MiniUtilDialog(self, "tagger").show()
 
     def on_click_expand(self):
         if self.is_expand:
@@ -592,6 +603,14 @@ class MyWidget(QMainWindow):
             except Exception as e:
                 self.main_splitter.setSizes([16777215, 16777215])
             QTimer.singleShot(20, self.image_result.refresh_size)
+
+    def install_model(self, model_name):
+        print(model_name)
+        loading_dialog = FileIODialog(
+            "모델 다운 받는 중...\n이 작업은 오래 걸릴 수 있습니다.", lambda: str(self.dtagger.download_model(model_name)))
+        if loading_dialog.exec_() == QDialog.Accepted:
+            if loading_dialog.result == "True":
+                self.option_dialog.on_model_downloaded(model_name)
 
     def get_image_info_bysrc(self, file_src):
         nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_src)
@@ -631,7 +650,9 @@ class MyWidget(QMainWindow):
         LoginDialog(self)
 
     def show_option_dialog(self):
-        OptionDialog(self)
+        self.option_dialog = OptionDialog(self)
+
+        self.option_dialog.exec_()
 
     def show_about_dialog(self):
         QMessageBox.about(self, 'About', S.ABOUT)
@@ -640,9 +661,16 @@ class MyWidget(QMainWindow):
         self.button_generate_once.setDisabled(will_disable)
         self.button_generate_auto.setDisabled(will_disable)
 
-    def set_result_text(self, naidict):
+    def set_result_text(self, nai_dict):
+        additional_dict = {}
+
+        if 'image' in nai_dict and nai_dict['image']:
+            additional_dict["image_src"] = self.i2i_settings_group.src or ""
+        if 'reference_image' in nai_dict and nai_dict['reference_image']:
+            additional_dict["reference_image_src"] = self.vibe_settings_group.src or ""
+
         QTimer.singleShot(20, lambda: self.prompt_result.setText(
-            prettify_naidict(naidict)))
+            prettify_naidict(nai_dict, additional_dict)))
 
     def refresh_anlas(self):
         anlas_thread = AnlasThread(self)
@@ -770,6 +798,37 @@ class MyWidget(QMainWindow):
         )
 
         self._set_image_gui(mode, src)
+
+    def predict_tag_from(self, filemode, target, with_dialog):
+        result = ""
+
+        target_model_name = self.settings.value("selected_tagger_model", '')
+        if not target_model_name:
+            QMessageBox.information(
+                self, '경고', "먼저 옵션에서 태깅 모델을 다운/선택 해주세요.")
+            return ""
+        else:
+            self.dtagger.options["model_name"] = target_model_name
+
+        if filemode == "src":
+            target = Image.open(target)
+
+        if with_dialog:
+            loading_dialog = FileIODialog(
+                "태그하는 중...", lambda: self.dtagger.tag(target))
+            if loading_dialog.exec_() == QDialog.Accepted:
+                result = loading_dialog.result
+                if not result:
+                    list_installed_model = self.dtagger.get_installed_models()
+                    if not (target_model_name in list_installed_model):
+                        self.settings.setValue("selected_tagger_model", '')
+        else:
+            try:
+                result = self.dtagger.tag(target)
+            except Exception as e:
+                print(e)
+
+        return result
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
