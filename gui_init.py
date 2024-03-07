@@ -859,6 +859,7 @@ def init_image_options_layout(self):
     )
 
     def i2i_on_click_removebutton():
+        self.dict_img_batch_target["img2img_foldersrc"] = ""
         i2i_settings_group.set_image()
         self.image_options_layout.setStretch(0, 0)
         if not self.vibe_settings_group.src:
@@ -894,6 +895,7 @@ def init_image_options_layout(self):
     )
 
     def vibe_on_click_removebutton():
+        self.dict_img_batch_target["vibe_foldersrc"] = ""
         vibe_settings_group.set_image()
         self.image_options_layout.setStretch(1, 0)
         if not self.i2i_settings_group.src:

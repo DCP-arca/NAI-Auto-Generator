@@ -30,7 +30,7 @@ def prettify_naidict(nai_dict, additional_dict={}):
         {ad['image_tag']}"""
 
     if 'reference_image' in d and d['reference_image']:
-        content += "\n\n바이브 적용중 :\n" + (f"    target : {ad['reference_image_src']}\n" if (
+        content += "\n\n바이브 트랜스퍼 :\n" + (f"    target : {ad['reference_image_src']}\n" if (
             'reference_image_src' in ad and ad['reference_image_src']) else '') + f"""    reference_information_extracted : {d['reference_information_extracted']}
     reference_strength : {d['reference_strength']}"""
         if 'reference_image_tag' in ad and ad['reference_image_tag']:
