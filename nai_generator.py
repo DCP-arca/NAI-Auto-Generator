@@ -10,7 +10,7 @@ from enum import Enum
 from PIL import Image
 import base64
 
-BASE_URL = "https://api.novelai.net"
+BASE_URL = "https://image.novelai.net"
 
 
 class NAIAction(Enum):
@@ -144,13 +144,14 @@ class NAIGenerator():
         # param_key type check
         assert(isinstance(param_key, NAIParam))
         # param_value type check
-        assert(isinstance(param_value, TYPE_NAIPARAM_DICT[param_key]))
+        if param_value is not None:
+            assert(isinstance(param_value, TYPE_NAIPARAM_DICT[param_key]))
 
         self.parameters[param_key.name] = param_value
 
     def set_param_dict(self, param_dict):
         for k, v in param_dict.items():
-            if k and (v is not None):
+            if k:
                 try:
                     param_key = NAIParam[k]
                     self.set_param(param_key, v)
@@ -160,7 +161,7 @@ class NAIGenerator():
 
     def get_anlas(self):
         try:
-            response = requests.get("https://api.novelai.net/user/subscription", headers={
+            response = requests.get(BASE_URL+"/user/subscription", headers={
                 "Authorization": f"Bearer {self.access_token}"})
             data_dict = json.loads(response.content)
             trainingStepsLeft = data_dict['trainingStepsLeft']
@@ -199,7 +200,7 @@ class NAIGenerator():
     def check_logged_in(self):
         access_result = None
         try:
-            access_result = requests.get("https://api.novelai.net/user/information", headers={
+            access_result = requests.get(BASE_URL+"/user/information", headers={
                                          "Authorization": f"Bearer {self.access_token}"}, timeout=5)
         except Exception as e:
             print(e)

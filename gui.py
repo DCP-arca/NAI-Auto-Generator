@@ -387,7 +387,6 @@ class MyWidget(QMainWindow):
             else:
                 self.vibe_settings_group.on_click_removebutton()
 
-
         return data
 
     def _preedit_prompt(self, prompt, nprompt):
@@ -614,7 +613,6 @@ class MyWidget(QMainWindow):
             QTimer.singleShot(20, self.image_result.refresh_size)
 
     def install_model(self, model_name):
-        print(model_name)
         loading_dialog = FileIODialog(
             "모델 다운 받는 중...\n이 작업은 오래 걸릴 수 있습니다.", lambda: str(self.dtagger.download_model(model_name)))
         if loading_dialog.exec_() == QDialog.Accepted:

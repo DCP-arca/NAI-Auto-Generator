@@ -895,7 +895,7 @@ def init_image_options_layout(self):
 
     def vibe_on_click_removebutton():
         vibe_settings_group.set_image()
-        self.image_options_layout.setStretch(0, 0)
+        self.image_options_layout.setStretch(1, 0)
         if not self.i2i_settings_group.src:
             self.image_options_layout.setStretch(2, 9999)
     vibe_settings_group.on_click_removebutton = vibe_on_click_removebutton

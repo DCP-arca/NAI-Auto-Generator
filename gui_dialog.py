@@ -607,9 +607,6 @@ class MiniUtilDialog(QDialog):
                 target_dict.update(nai_dict["option"])
                 target_dict.update(nai_dict["etc"])
 
-                import json
-                print(json.dumps(target_dict, sort_keys=True, indent=4))
-
                 if 'reference_strength' in target_dict:
                     rs_float = 0.0
                     try:
