@@ -536,6 +536,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def proceed_settings_batch(self):
         self.index_settings_batch_target += 1
+
+        while len(self.list_settings_batch_target) <= self.index_settings_batch_target:
+            self.index_settings_batch_target -= len(self.list_settings_batch_target)
+
         path = self.list_settings_batch_target[self.index_settings_batch_target]
         is_success = self._load_settings(path)
 
