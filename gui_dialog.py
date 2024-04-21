@@ -684,7 +684,7 @@ class MiniUtilDialog(QDialog):
                     self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.")
             else:
                 QMessageBox.information(
-                    self, '경고', "태그 불렁오기는 png, webp 파일만 가능합니다.")
+                    self, '경고', "태그 불러오기는 png, webp 파일만 가능합니다.")
         else:
             try:
                 url = furl.url()

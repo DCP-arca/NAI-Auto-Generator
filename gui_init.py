@@ -964,11 +964,14 @@ def init_buttons_layout(self):
     self.label_loginstate.set_logged_in(False)
     hbox_generate.addWidget(self.label_loginstate)
     self.button_generate_once = add_button(
-        hbox_generate, "생성", self.on_click_generate_once, 240, 200)
+        hbox_generate, "생성", self.on_click_generate_once, 200, 200)
     self.button_generate_auto = add_button(
-        hbox_generate, "연속 생성", self.on_click_generate_auto, 240, 200)
+        hbox_generate, "연속 생성", self.on_click_generate_auto, 200, 200)
+    self.button_generate_sett = add_button(
+        hbox_generate, "연속 세팅 생성", self.on_click_generate_sett, 200, 200)
     self.button_generate_once.setDisabled(True)
     self.button_generate_auto.setDisabled(True)
+    self.button_generate_sett.setDisabled(True)
 
     main_layout.addWidget(create_empty(minimum_height=5))
 

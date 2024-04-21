@@ -140,7 +140,31 @@ def create_windows_filepath(base_path, filename, extension, max_length=150):
     return filepath
 
 
-class MyWidget(QMainWindow):
+def inject_imagetag(original_str, tagname, additional_str):
+    result_str = original_str[:]
+
+    tag_str_left = "@@" + tagname
+    left_pos = original_str.find(tag_str_left)
+    if left_pos != -1:
+        right_pos = original_str.find("@@", left_pos + 1)
+        except_tag_list = [x.strip() for x in original_str[left_pos +
+                                                           len(tag_str_left) + 1:right_pos].split(",")]
+        original_tag_list = [x.strip() for x in additional_str.split(',')]
+        target_tag_list = [
+            x for x in original_tag_list if x not in except_tag_list]
+
+        result_str = original_str[0:left_pos] + ", ".join(target_tag_list) + \
+            original_str[right_pos + 2:len(original_str)]
+
+    return result_str
+
+
+def get_filename_only(path):
+    filename, _ = os.path.splitext(os.path.basename(path))
+    return filename
+
+
+class NAIAutoGeneratorWindow(QMainWindow):
 
     def __init__(self, app):
         super().__init__()
@@ -162,6 +186,8 @@ class MyWidget(QMainWindow):
         self.is_expand = False
         self.trying_auto_login = False
         self.autogenerate_thread = None
+        self.list_settings_batch_target = []
+        self.index_settings_batch_target = -1
         self.dict_img_batch_target = {
             "img2img_foldersrc": "",
             "img2img_index": -1,
@@ -395,13 +421,16 @@ class MyWidget(QMainWindow):
             if self.i2i_settings_group.src:
                 if self.i2i_last_generated_target != self.i2i_settings_group.src:
                     self.i2i_last_generated_target = self.i2i_settings_group.src
-                    self.i2i_last_generated_result = self.predict_tag_from("src", self.i2i_settings_group.src, False)
+                    self.i2i_last_generated_result = self.predict_tag_from(
+                        "src", self.i2i_settings_group.src, False)
                     if not self.i2i_last_generated_result:
                         self.i2i_last_generated_target = ""
                         self.i2i_last_generated_result = ""
 
-                data["prompt"] = data["prompt"].replace("@@img2img@@", self.i2i_last_generated_result)
-                data["negative_prompt"] = data["negative_prompt"].replace("@@img2img@@", self.i2i_last_generated_result)
+                data["prompt"] = inject_imagetag(
+                    data["prompt"], "img2img", self.i2i_last_generated_result)
+                data["negative_prompt"] = inject_imagetag(
+                    data["negative_prompt"], "img2img", self.i2i_last_generated_result)
         else:
             self.i2i_last_generated_target = ""
             self.i2i_last_generated_result = ""
@@ -409,13 +438,16 @@ class MyWidget(QMainWindow):
             if self.vibe_settings_group.src:
                 if self.vibe_last_generated_target != self.vibe_settings_group.src:
                     self.vibe_last_generated_target = self.vibe_settings_group.src
-                    self.vibe_last_generated_result = self.predict_tag_from("src", self.vibe_settings_group.src, False)
+                    self.vibe_last_generated_result = self.predict_tag_from(
+                        "src", self.vibe_settings_group.src, False)
                     if not self.vibe_last_generated_result:
                         self.vibe_last_generated_target = ""
                         self.vibe_last_generated_result = ""
 
-                data["prompt"] = data["prompt"].replace("@@vibe@@", self.vibe_last_generated_result)
-                data["negative_prompt"] = data["negative_prompt"].replace("@@vibe@@", self.vibe_last_generated_result)
+                data["prompt"] = inject_imagetag(
+                    data["prompt"], "vibe", self.vibe_last_generated_result)
+                data["negative_prompt"] = inject_imagetag(
+                    data["negative_prompt"], "vibe", self.vibe_last_generated_result)
         else:
             self.vibe_last_generated_target = ""
             self.vibe_last_generated_result = ""
@@ -453,6 +485,8 @@ class MyWidget(QMainWindow):
         return edited_prompt, edited_nprompt
 
     def on_click_generate_once(self):
+        self.list_settings_batch_target = []
+
         data = self._get_data_for_generate()
         self.nai.set_param_dict(data)
         self.set_result_text(data)
@@ -482,10 +516,44 @@ class MyWidget(QMainWindow):
             QMessageBox.information(
                 self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
 
-    def on_click_generate_auto(self):
+    def on_click_generate_sett(self):
+        path_list, _ = QFileDialog().getOpenFileNames(self,
+                                                      caption="불러올 세팅 파일들을 선택해주세요",
+                                                      filter="Txt File (*.txt)")
+        if path_list:
+            if len(path_list) < 2:
+                QMessageBox.information(
+                    self, '경고', "두개 이상 선택해주세요.")
+                return
+
+            for path in path_list:
+                if not path.endswith(".txt") or not os.path.isfile(path):
+                    QMessageBox.information(
+                        self, '경고', ".txt로 된 세팅 파일만 선택해주세요.")
+                    return
+
+            self.on_click_generate_auto(path_list)
+
+    def proceed_settings_batch(self):
+        self.index_settings_batch_target += 1
+        path = self.list_settings_batch_target[self.index_settings_batch_target]
+        is_success = self._load_settings(path)
+
+        return is_success
+
+    def on_click_generate_auto(self, setting_batch_target=[]):
         if not self.autogenerate_thread:
             d = GenerateDialog(self)
             if d.exec_() == QDialog.Accepted:
+                self.list_settings_batch_target = setting_batch_target
+                if setting_batch_target:
+                    self.index_settings_batch_target = -1
+                    is_success = self.proceed_settings_batch()
+                    if not is_success:
+                        QMessageBox.information(
+                            self, '경고', "세팅을 불러오는데 실패했습니다.")
+                        return
+
                 autogenerate_thread = AutoGenerateThread(
                     self, d.count, d.delay, d.ignore_error)
                 autogenerate_thread.autogenerate_error.connect(
@@ -494,6 +562,8 @@ class MyWidget(QMainWindow):
                     self._on_end_autogenerate)
                 autogenerate_thread.autogenerate_result_text_dict.connect(
                     self.set_result_text)
+                autogenerate_thread.autogenerate_on_proceed_setting_batch.connect(
+                    self.proceed_settings_batch)
                 autogenerate_thread.start()
 
                 self.set_autogenerate_mode(True)
@@ -515,6 +585,7 @@ class MyWidget(QMainWindow):
 
     def set_autogenerate_mode(self, is_autogenrate):
         self.button_generate_once.setDisabled(is_autogenrate)
+        self.button_generate_sett.setDisabled(is_autogenrate)
 
         stylesheet = """
             color:black;
@@ -565,16 +636,25 @@ class MyWidget(QMainWindow):
         path, _ = select_dialog.getOpenFileName(
             self, "불러올 세팅 파일을 선택해주세요", path, "Txt File (*.txt)")
         if path:
-            try:
-                with open(path, "r", encoding="utf8") as f:
-                    json_str = f.read()
-                json_obj = json.loads(json_str)
+            is_success = self._load_settings(path)
 
-                self.set_data(json_obj)
-            except Exception as e:
-                print(e)
+            if not is_success:
                 QMessageBox.information(
                     self, '경고', "세팅을 불러오는데 실패했습니다.\n\n" + str(e))
+
+    def _load_settings(self, path):
+        try:
+            with open(path, "r", encoding="utf8") as f:
+                json_str = f.read()
+            json_obj = json.loads(json_str)
+
+            self.set_data(json_obj)
+
+            return True
+        except Exception as e:
+            print(e)
+
+        return False
 
     def show_prompt_dialog(self, title, prompt, nprompt):
         QMessageBox.about(self, title,
@@ -701,6 +781,7 @@ class MyWidget(QMainWindow):
 
     def set_disable_button(self, will_disable):
         self.button_generate_once.setDisabled(will_disable)
+        self.button_generate_sett.setDisabled(will_disable)
         self.button_generate_auto.setDisabled(will_disable)
 
     def set_result_text(self, nai_dict):
@@ -857,7 +938,7 @@ class MyWidget(QMainWindow):
                 return
 
             QMessageBox.information(
-                self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@"+mode+"@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
+                self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@" + mode + "@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
             return
 
     def predict_tag_from(self, filemode, target, with_dialog):
@@ -979,6 +1060,7 @@ class MyWidget(QMainWindow):
 class AutoGenerateThread(QThread):
     autogenerate_error = pyqtSignal(int, str)
     autogenerate_result_text_dict = pyqtSignal(dict)
+    autogenerate_on_proceed_setting_batch = pyqtSignal()
     autogenerate_end = pyqtSignal()
 
     def __init__(self, parent, count, delay, ignore_error):
@@ -1012,8 +1094,19 @@ class AutoGenerateThread(QThread):
                 parent.set_statusbar_text("AUTO_GENERATING_COUNT", [
                     self.count, self.count - count + 1])
 
+            # before generate, if setting batch
+            path = parent.settings.value(
+                "path_results", DEFAULT_PATH["path_results"])
+            create_folder_if_not_exists(path)
+            if parent.list_settings_batch_target:
+                setting_path = parent.list_settings_batch_target[parent.index_settings_batch_target]
+                setting_name = get_filename_only(setting_path)
+                path = path + "/" + setting_name
+                create_folder_if_not_exists(path)
+
             # generate image
-            error_code, result_str = _threadfunc_generate_image(self)
+            error_code, result_str = _threadfunc_generate_image(
+                self, path)
             if self.is_dead:
                 return
             if error_code == 0:
@@ -1026,6 +1119,8 @@ class AutoGenerateThread(QThread):
                     parent.proceed_image_batch("img2img")
                 if parent.dict_img_batch_target["vibe_foldersrc"]:
                     parent.proceed_image_batch("vibe")
+                if parent.list_settings_batch_target:
+                    self.autogenerate_on_proceed_setting_batch.emit()
             else:
                 if self.ignore_error:
                     for t in range(int(delay), 0, -1):
@@ -1058,7 +1153,7 @@ class AutoGenerateThread(QThread):
         self.quit()
 
 
-def _threadfunc_generate_image(thread_self):
+def _threadfunc_generate_image(thread_self, path):
     # 1 : get image
     nai = thread_self.parent().nai
     data = nai.generate_image(NAIAction.img2img
@@ -1075,8 +1170,6 @@ def _threadfunc_generate_image(thread_self):
         return 2, str(e) + str(data)
 
     # 3 : save image
-    path = thread_self.parent().settings.value(
-        "path_results", DEFAULT_PATH["path_results"])
     create_folder_if_not_exists(path)
     timename = datetime.datetime.now().strftime(
         "%y%m%d_%H%M%S%f")[:-4]
@@ -1147,7 +1240,7 @@ if __name__ == '__main__':
     }
     # apply_stylesheet(app, theme='light_teal_500.xml',
     #                  invert_secondary=True, extra=MAIN_COLOR)
-    widget = MyWidget(app)
+    widget = NAIAutoGeneratorWindow(app)
 
     time.sleep(0.1)
 
