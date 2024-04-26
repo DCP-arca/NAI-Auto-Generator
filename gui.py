@@ -573,7 +573,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.set_autogenerate_mode(True)
                 self.autogenerate_thread = autogenerate_thread
         else:
-            self.autogenerate_thread.stop()
             self._on_end_autogenerate()
 
     def _on_error_autogenerate(self, error_code, result):
@@ -582,6 +581,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self._on_end_autogenerate()
 
     def _on_end_autogenerate(self):
+        self.autogenerate_thread.stop()
         self.autogenerate_thread = None
         self.set_autogenerate_mode(False)
         self.set_statusbar_text("IDLE")
@@ -1198,7 +1198,9 @@ class GenerateThread(QThread):
         super(GenerateThread, self).__init__(parent)
 
     def run(self):
-        error_code, result_str = _threadfunc_generate_image(self)
+        path = self.parent().settings.value(
+            "path_results", DEFAULT_PATH["path_results"])
+        error_code, result_str = _threadfunc_generate_image(self, path)
 
         self.generate_result.emit(error_code, result_str)
 
@@ -1230,20 +1232,7 @@ class AnlasThread(QThread):
 if __name__ == '__main__':
     input_list = sys.argv
     app = QApplication(sys.argv)
-
-    MAIN_COLOR = {
-        # Font
-        "font-size": '20px',
-        "primaryColor": '#009688',
-        "primaryLightColor": '#52c7b8',
-        "secondaryColor": '#f5f5f5',
-        "secondaryLightColor": '#ffffff',
-        "secondaryDarkColor": '#E6E6E6',
-        "primaryTextColor": '#000000',
-        "secondaryTextColor": '#000000'
-    }
-    # apply_stylesheet(app, theme='light_teal_500.xml',
-    #                  invert_secondary=True, extra=MAIN_COLOR)
+    
     widget = NAIAutoGeneratorWindow(app)
 
     time.sleep(0.1)

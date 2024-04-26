@@ -3,7 +3,7 @@ import os
 
 from PIL import Image
 
-from PyQt5.QtWidgets import QApplication, QMainWindow
+from PyQt5.QtWidgets import QMessageBox, QApplication, QMainWindow
 from PyQt5.QtCore import QSettings
 
 from gui_dialog import MiniUtilDialog, FileIODialog, QDialog
