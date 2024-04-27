@@ -3,9 +3,9 @@ import argon2
 from base64 import urlsafe_b64encode
 import requests
 import random
-import zipfile
 import json
 import io
+import zipfile
 from enum import Enum
 from PIL import Image
 import base64
@@ -16,7 +16,8 @@ BASE_URL = "https://image.novelai.net"
 
 class NAIAction(Enum):
     generate = "generate",
-    img2img = "img2img"
+    img2img = "img2img",
+    infill = "infill"
 
 
 class NAIParam(Enum):
@@ -41,6 +42,7 @@ class NAIParam(Enum):
     image = 19,
     noise = 20,
     strength = 21,
+    mask = 22,
 
 
 TYPE_NAIPARAM_DICT = {
@@ -64,7 +66,8 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.reference_strength: float,
     NAIParam.image: str,
     NAIParam.noise: float,
-    NAIParam.strength: float
+    NAIParam.strength: float,
+    NAIParam.mask: str,
 }
 
 
@@ -114,6 +117,7 @@ class NAIGenerator():
             "cfg_rescale": 0,
             "noise_schedule": "native",
             "image": None,
+            "mask": None,
             "noise": 0.0,
             "strength": 0.7,
             "reference_image": None,
@@ -178,13 +182,15 @@ class NAIGenerator():
     def generate_image(self, action: NAIAction):
         assert(isinstance(action, NAIAction))
 
+        model = "nai-diffusion-3" if action != NAIAction.infill else "nai-diffusion-3-inpainting"
+
         if self.parameters["extra_noise_seed"] == -1:
             self.parameters["extra_noise_seed"] = self.parameters["seed"]
 
         url = BASE_URL + f"/ai/generate-image"
         data = {
             "input": self.parameters["prompt"],
-            "model": "nai-diffusion-3",
+            "model": model,
             "action": action.name,
             "parameters": self.parameters,
         }
@@ -228,29 +234,32 @@ if __name__ == "__main__":
     print(naiG.check_logged_in())
 
     if is_login_success:
-        print(naiG.get_anlas())
+        # print(naiG.get_anlas())
 
-    #     naiG.set_param_dict({
-    #         "prompt": "1girl",
-    #         "negative_prompt": "bad quality",
-    #         "width": 512,
-    #         "height": 512,
-    #         "steps": 28,
-    #         "current_sampler": "k_euler_ancestral",
-    #         "cfg_scale": 5.0,
-    #         "cfg_rescale": 0.0,
-    #         "sm": True,
-    #         "sm_dyn": True,
-    #         # "image": get_img_base64("test.png"),
-    #         # "strength": 0.5,
-    #         # "noise": 0.0,
-    #         # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
-    #     })
+        naiG.set_param_dict({
+            "prompt": "1girl, green eyes",
+            "negative_prompt": "bad quality",
+            "width": 1024,
+            "height": 1024,
+            "steps": 28,
+            "current_sampler": "k_euler_ancestral",
+            "cfg_scale": 5.0,
+            "cfg_rescale": 0.0,
+            "sm": False,
+            "sm_dyn": False,
+            "image": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\target.png"),
+            "mask": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\mask.png"),
+            # "add_original_image": False,
+            "strength": 0.8,
+            "noise": 0.0,
+            # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
+        })
 
-    #     img = naiG.generate_image(action=NAIAction.generate)
-    #     # img = naiG.generate_image(action=NAIAction.img2im)
+        img = naiG.generate_image(action=NAIAction.infill)
+        # img = naiG.generate_image(action=NAIAction.img2img)
 
-    #     zipped = zipfile.ZipFile(io.BytesIO(img))
-    #     image_bytes = zipped.read(zipped.infolist()[0])
-    #     img = Image.open(io.BytesIO(image_bytes))
-    #     img.save("asd.png")
+        print(img)
+        zipped = zipfile.ZipFile(io.BytesIO(img))
+        image_bytes = zipped.read(zipped.infolist()[0])
+        img = Image.open(io.BytesIO(image_bytes))
+        img.save(r"C:\Users\thddy\Downloads\result.png")

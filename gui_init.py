@@ -1,13 +1,15 @@
 import os
 import sys
 
-from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QTextEdit, QLineEdit, QCheckBox, QStyledItemDelegate, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QGroupBox, QSlider, QFrame, QSplitter, QSizePolicy
+from PyQt5.QtWidgets import QWidget, QRadioButton, QLabel, QTextEdit, QLineEdit, QCheckBox, QStyledItemDelegate, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QComboBox, QGroupBox, QSlider, QFrame, QSplitter, QSizePolicy, QDialog
 from PyQt5.QtGui import QColor, QIntValidator, QFont, QPalette, QPixmap, QImage, QPainter
 from PyQt5.QtCore import Qt, QSize, QEvent, QTimer, QRectF, pyqtSignal
 
 from PIL import Image
 
 from consts import COLOR, S
+
+from gui_paint_dialog import InpaintDialog
 
 ########################################################
 
@@ -229,6 +231,10 @@ class BackgroundFrame(QFrame):
 
     def set_background_image(self, image_path):
         self.image.load(image_path)
+        self.update()
+
+    def set_background_image_by_img(self, image):
+        self.image = image
         self.update()
 
     def paintEvent(self, event):
@@ -678,7 +684,7 @@ def init_paramater_options_layout(self):
 
 def init_image_options_layout(self):
     class ImageSettingGroup(QGroupBox):
-        def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder, func_tag_check):
+        def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder, func_tag_check, add_inpaint_button):
             super(ImageSettingGroup, self).__init__(title)
             self.setAcceptDrops(True)
 
@@ -790,6 +796,13 @@ def init_image_options_layout(self):
 
             # tagcheck_layout
             tagcheck_layout = QHBoxLayout()
+
+            # inpaint
+            if add_inpaint_button:
+                inpaint_button = QPushButton("인페인트")
+                inpaint_button.clicked.connect(self.on_click_inpaint_button)
+                tagcheck_layout.addWidget(inpaint_button)
+
             tagcheck_layout.addStretch(999)
 
             tagcheck_checkbox = QCheckBox("이미지 태그 자동 추가: ")
@@ -814,6 +827,7 @@ def init_image_options_layout(self):
 
         def set_image(self, src=""):
             self.src = src
+            self.mask = None
             if src:
                 self.before_frame.hide()
                 self.after_frame.show()
@@ -843,6 +857,14 @@ def init_image_options_layout(self):
         def connect_on_click_removebutton(self, func):
             self.target_remove_button.pressed.connect(func)
 
+        def on_click_inpaint_button(self):
+            img = QImage(self.src)
+            mask = self.mask if self.mask else None
+            d = InpaintDialog(img, mask)
+            if d.exec_() == QDialog.Accepted:
+                self.after_frame.set_background_image_by_img(d.mask_add)
+                self.mask = d.mask_only
+
     image_options_layout = QVBoxLayout()
 
     # I2I Settings Group
@@ -870,7 +892,8 @@ def init_image_options_layout(self):
         ),
         func_open_img=lambda: self.show_file_dialog("img2img"),
         func_open_folder=lambda: self.show_openfolder_dialog("img2img"),
-        func_tag_check=lambda: self.on_click_tagcheckbox("img2img")
+        func_tag_check=lambda: self.on_click_tagcheckbox("img2img"),
+        add_inpaint_button=True
     )
 
     def i2i_on_click_removebutton():
@@ -907,7 +930,8 @@ def init_image_options_layout(self):
         ),
         func_open_img=lambda: self.show_file_dialog("vibe"),
         func_open_folder=lambda: self.show_openfolder_dialog("vibe"),
-        func_tag_check=lambda: self.on_click_tagcheckbox("vibe")
+        func_tag_check=lambda: self.on_click_tagcheckbox("vibe"),
+        add_inpaint_button=False
     )
 
     def vibe_on_click_removebutton():

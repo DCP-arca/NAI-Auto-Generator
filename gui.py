@@ -6,12 +6,14 @@ import zipfile
 import time
 import datetime
 import random
+import base64
 from io import BytesIO
 from PIL import Image
 from urllib import request
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
-from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QBuffer
+from PyQt5.QtGui import QImage
 from gui_init import init_main_widget
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
 
@@ -162,6 +164,20 @@ def inject_imagetag(original_str, tagname, additional_str):
 def get_filename_only(path):
     filename, _ = os.path.splitext(os.path.basename(path))
     return filename
+
+
+def convert_qimage_to_imagedata(qimage):
+    try:
+        buf = QBuffer()
+        buf.open(QBuffer.ReadWrite)
+        qimage.save(buf, "PNG")
+        pil_im = Image.open(io.BytesIO(buf.data()))
+
+        buf = io.BytesIO()
+        pil_im.save(buf, format='png', quality=100)
+        return base64.b64encode(buf.getvalue()).decode("utf-8")
+    except Exception as e:
+        return ""
 
 
 class NAIAutoGeneratorWindow(QMainWindow):
@@ -406,6 +422,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.i2i_settings_group.src)
             if imgdata_i2i:
                 data["image"] = imgdata_i2i
+                # 만약 i2i가 켜져있다면
+                # sm설정을 반드시 꺼야함. 안그러면 흐릿하게 나옴.
+                data['sm'] = False
+                data['sm_dyn'] = False
+
+                # mask 체크
+                if self.i2i_settings_group.mask:
+                    data['mask'] = convert_qimage_to_imagedata(
+                        self.i2i_settings_group.mask)
             else:
                 self.i2i_settings_group.on_click_removebutton()
         if self.vibe_settings_group.src:
@@ -538,7 +563,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.index_settings_batch_target += 1
 
         while len(self.list_settings_batch_target) <= self.index_settings_batch_target:
-            self.index_settings_batch_target -= len(self.list_settings_batch_target)
+            self.index_settings_batch_target -= len(
+                self.list_settings_batch_target)
 
         path = self.list_settings_batch_target[self.index_settings_batch_target]
         is_success = self._load_settings(path)
@@ -1160,8 +1186,12 @@ class AutoGenerateThread(QThread):
 def _threadfunc_generate_image(thread_self, path):
     # 1 : get image
     nai = thread_self.parent().nai
-    data = nai.generate_image(NAIAction.img2img
-                              if nai.parameters["image"] else NAIAction.generate)
+    action = NAIAction.generate
+    if nai.parameters["image"]:
+        action = NAIAction.img2img
+    if nai.parameters['mask']:
+        action = NAIAction.infill
+    data = nai.generate_image(action)
     if not data:
         return 1, "서버에서 정보를 가져오는데 실패했습니다."
 
@@ -1232,7 +1262,7 @@ class AnlasThread(QThread):
 if __name__ == '__main__':
     input_list = sys.argv
     app = QApplication(sys.argv)
-    
+
     widget = NAIAutoGeneratorWindow(app)
 
     time.sleep(0.1)
