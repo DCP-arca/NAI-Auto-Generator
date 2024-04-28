@@ -150,13 +150,13 @@ class InpaintDialog(QDialog):
                 painter.drawLine(p1, p2)
             else:
                 brush_pos = QPoint(
-                    int(p1.x() - brush_size / 2),
-                    int(p2.y() - brush_size / 2)
+                    int(p1.x() - brush_size / 4),
+                    int(p2.y() - brush_size / 4)
                 )
 
                 painter.setCompositionMode(QPainter.CompositionMode_Clear)
                 painter.eraseRect(brush_pos.x(), brush_pos.y(), int(
-                    brush_size), int(brush_size))
+                    brush_size/2), int(brush_size/2))
 
             self.last_point = event.pos()
             self.update()
