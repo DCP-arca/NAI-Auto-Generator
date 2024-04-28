@@ -1,9 +1,10 @@
 import sys
-import os
 from collections import deque
-from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QLabel, QSlider, QVBoxLayout, QWidget, QPushButton, QFileDialog, QHBoxLayout, QCheckBox
-from PyQt5.QtGui import QPixmap, QPainter, QPen, QImage, QColor, qRgb, qRgba
-from PyQt5.QtCore import Qt, QPoint, QSize, QTimer, QRect, QEvent
+from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QLabel, QSlider, QVBoxLayout, QWidget, QPushButton, QHBoxLayout, QCheckBox, QShortcut
+from PyQt5.QtGui import QPainter, QPen, QImage, qRgb, qRgba, QKeySequence
+from PyQt5.QtCore import Qt, QPoint, QSize, QEvent
+
+DEFAULT_WINDOW_SIZE = 400
 
 
 def convert_coord(point, original_image_size, now_image_rect):
@@ -16,8 +17,12 @@ def convert_coord(point, original_image_size, now_image_rect):
     return QPoint(x, y)
 
 
-def convert_brush_coord(brush_size, now_image_rect):
-    return brush_size * (now_image_rect.width() / now_image_rect.height())
+def convert_brush_coord(brush_size, original_image_size, now_image_rect):
+    if original_image_size.width() > original_image_size.height():
+        seed = original_image_size.width() / now_image_rect.width()
+    else:
+        seed = original_image_size.height() / now_image_rect.height()
+    return brush_size * seed * 2
 
 
 # 빈곳은 검게, 있는 곳은 하얗게 만든다. 투명도가 없어진다.
@@ -79,13 +84,14 @@ class InpaintDialog(QDialog):
 
         # Label for Image
         self.image_label = QLabel(self)
-        self.image_label.setMinimumSize(QSize(400, 400))
+        self.image_label.setMinimumSize(
+            QSize(DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE))
         self.image_label.installEventFilter(self)
         self.image_label.setMouseTracking(True)
 
         # Slider for brush size
         self.slider = QSlider(Qt.Horizontal, self)
-        self.slider.setRange(20, 200)
+        self.slider.setRange(10, 200)
         self.slider.setValue(40)
         self.slider.valueChanged.connect(self.change_brush_size)
 
@@ -116,6 +122,9 @@ class InpaintDialog(QDialog):
         layout.addLayout(layout_buttons)
         self.setLayout(layout)
 
+        shortcut = QShortcut(QKeySequence(Qt.CTRL + Qt.Key_Z), self)
+        shortcut.activated.connect(self.on_press_ctrlz)
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton and not self.draw_image.isNull():
             self.drawing = True
@@ -127,7 +136,7 @@ class InpaintDialog(QDialog):
             painter = QPainter(self.draw_image)
             painter.setBackgroundMode(Qt.BGMode.OpaqueMode)
             brush_size = convert_brush_coord(
-                self.brush_size, self.now_image_rect)
+                self.brush_size, self.image_original_size, self.now_image_rect)
 
             painter.setPen(QPen(Qt.black, brush_size,
                                 Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
@@ -140,9 +149,14 @@ class InpaintDialog(QDialog):
             if not self.is_erase_mod:
                 painter.drawLine(p1, p2)
             else:
+                brush_pos = QPoint(
+                    int(p1.x() - brush_size / 2),
+                    int(p2.y() - brush_size / 2)
+                )
+
                 painter.setCompositionMode(QPainter.CompositionMode_Clear)
-                painter.eraseRect(p1.x(), p1.y(), int(
-                    brush_size / 2), int(brush_size / 2))
+                painter.eraseRect(brush_pos.x(), brush_pos.y(), int(
+                    brush_size), int(brush_size))
 
             self.last_point = event.pos()
             self.update()
@@ -182,8 +196,7 @@ class InpaintDialog(QDialog):
         canvas_painter.setOpacity(0.3)
         canvas_painter.setPen(QPen(Qt.black))
         if not self.is_erase_mod:
-            brush_size = convert_brush_coord(
-                self.brush_size, self.now_image_rect) / 5
+            brush_size = self.brush_size
             # brush_pos = self.now_mouse_pos + 20
             brush_pos = QPoint(
                 int(self.now_mouse_pos.x() + 15),
@@ -191,12 +204,11 @@ class InpaintDialog(QDialog):
             )
             canvas_painter.drawEllipse(brush_pos, brush_size, brush_size)
         else:
-            brush_size = int(convert_brush_coord(
-                self.brush_size, self.now_image_rect) / 5)
+            brush_size = self.brush_size
             # brush_pos = self.now_mouse_pos + 20
             brush_pos = QPoint(
-                int(self.now_mouse_pos.x() + 15),
-                int(self.now_mouse_pos.y() + 15)
+                int(self.now_mouse_pos.x() + 15 - brush_size / 2),
+                int(self.now_mouse_pos.y() + 15 - brush_size / 2)
             )
             canvas_painter.drawRect(
                 brush_pos.x(), brush_pos.y(), brush_size, brush_size)
@@ -237,6 +249,7 @@ class InpaintDialog(QDialog):
 
     def on_check_erase(self, is_erase_mod):
         self.is_erase_mod = is_erase_mod
+        self.update()
 
     def on_click_undo(self):
         if len(self.last_image_deque) > 0:
@@ -244,8 +257,12 @@ class InpaintDialog(QDialog):
             self.update()
 
     def on_click_clear(self):
+        self.last_image_deque.append(self.draw_image.copy())
         self.draw_image.fill(0)
         self.update()
+
+    def on_press_ctrlz(self):
+        self.on_click_undo()
 
     def on_quit_button(self):
         self.reject()

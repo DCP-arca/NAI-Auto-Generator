@@ -417,6 +417,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # image option check
         data["image"] = None
         data["reference_image"] = None
+        data["mask"] = None
         if self.i2i_settings_group.src:
             imgdata_i2i = self.nai.convert_src_to_imagedata(
                 self.i2i_settings_group.src)
@@ -640,6 +641,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         path = self.settings.value(
             target_pathcode, DEFAULT_PATH[target_pathcode])
         path = os.path.abspath(path)
+        create_folder_if_not_exists(path)
         os.startfile(path)
 
     def on_click_save_settings(self):
@@ -878,8 +880,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def show_file_dialog(self, mode):
         select_dialog = QFileDialog()
         select_dialog.setFileMode(QFileDialog.ExistingFile)
+        target_type = '이미지, 텍스트 파일(*.txt *.png *.webp)' if mode == 'file' else '이미지 파일(*.jpg *.png *.webp)'
         fname = select_dialog.getOpenFileName(
-            self, '불러올 파일을 선택해 주세요.', '', '이미지, 텍스트 파일(*.txt *.png *.webp)')
+            self, '불러올 파일을 선택해 주세요.', '', target_type)
 
         if fname[0]:
             fname = fname[0]
@@ -894,13 +897,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
                         self, '경고', "png, webp, txt 파일만 가능합니다.")
                     return
             else:
-                if fname.endswith(".png") or fname.endswith(".webp"):
+                if fname.endswith(".png") or fname.endswith(".webp") or fname.endswith(".jpg"):
                     self.set_image_as_param(mode, fname)
                 elif os.path.isdir(fname):
                     self.set_imagefolder_as_param(mode, fname)
                 else:
                     QMessageBox.information(
-                        self, '경고', "png, webp 또는 폴더만 가능합니다.")
+                        self, '경고', "불러오기는 폴더, jpg, png, webp만 가능합니다.")
                     return
 
     def show_openfolder_dialog(self, mode):
@@ -1018,14 +1021,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         furl = files[0]
         if furl.isLocalFile():
             fname = furl.toLocalFile()
-            if fname.endswith(".png") or fname.endswith(".webp"):
+            if fname.endswith(".png") or fname.endswith(".webp") or fname.endswith(".jpg"):
                 if self.i2i_settings_group.geometry().contains(event.pos()):
                     self.set_image_as_param("img2img", fname)
+                    return
                 elif self.vibe_settings_group.geometry().contains(event.pos()):
                     self.set_image_as_param("vibe", fname)
-                else:
+                    return
+                elif not fname.endswith(".jpg"):
                     self.get_image_info_bysrc(fname)
-                return
+                    return
             elif fname.endswith(".txt"):
                 self.get_image_info_bytxt(fname)
                 return

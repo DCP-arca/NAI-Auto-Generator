@@ -902,6 +902,7 @@ def init_image_options_layout(self):
         self.image_options_layout.setStretch(0, 0)
         if not self.vibe_settings_group.src:
             self.image_options_layout.setStretch(2, 9999)
+        print(self.i2i_settings_group.mask)
     i2i_settings_group.on_click_removebutton = i2i_on_click_removebutton
     i2i_settings_group.connect_on_click_removebutton(i2i_on_click_removebutton)
     image_options_layout.addWidget(i2i_settings_group, stretch=0)
