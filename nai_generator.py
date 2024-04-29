@@ -26,8 +26,6 @@ class NAIParam(Enum):
     width = 3
     height = 4
     steps = 5
-    current_sampler = 6
-    cfg_scale = 7
     cfg_rescale = 8
     sm = 9
     sm_dyn = 10
@@ -51,8 +49,6 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.width: int,
     NAIParam.height: int,
     NAIParam.steps: int,
-    NAIParam.current_sampler: str,
-    NAIParam.cfg_scale: float,
     NAIParam.cfg_rescale: float,
     NAIParam.sm: bool,
     NAIParam.sm_dyn: bool,
@@ -224,8 +220,13 @@ class NAIGenerator():
 
 
 if __name__ == "__main__":
-    username = "username"
-    password = "password"
+    import configparser
+    config = configparser.ConfigParser()
+    config.read('testsetting.ini')
+    username = config['USER']['username']
+    password = config['USER']['password']
+
+    print(username, password)
 
     naiG = NAIGenerator()
 
@@ -239,27 +240,29 @@ if __name__ == "__main__":
         naiG.set_param_dict({
             "prompt": "1girl, green eyes",
             "negative_prompt": "bad quality",
-            "width": 1024,
-            "height": 1024,
+            "width": 512,
+            "height": 512,
             "steps": 28,
-            "current_sampler": "k_euler_ancestral",
-            "cfg_scale": 5.0,
+            "sampler": "ddim_v3",
+            "scale": 5.0,
             "cfg_rescale": 0.0,
             "sm": False,
             "sm_dyn": False,
-            "image": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\target.png"),
-            "mask": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\mask.png"),
+            # 'mask':'',
+            # 'image':'',
+            # "image": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\target.png"),
+            # "mask": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\mask.png"),
             # "add_original_image": False,
             "strength": 0.8,
             "noise": 0.0,
             # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
         })
 
-        img = naiG.generate_image(action=NAIAction.infill)
+        img = naiG.generate_image(action=NAIAction.generate)
         # img = naiG.generate_image(action=NAIAction.img2img)
 
         print(img)
         zipped = zipfile.ZipFile(io.BytesIO(img))
         image_bytes = zipped.read(zipped.infolist()[0])
         img = Image.open(io.BytesIO(image_bytes))
-        img.save(r"C:\Users\thddy\Downloads\result.png")
+        img.save(r"testresult.png")

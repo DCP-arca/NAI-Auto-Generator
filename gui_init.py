@@ -43,7 +43,7 @@ MAIN_STYLESHEET = """
     """
 
 SAMPLER_ITEMS = ['k_euler', 'k_euler_ancestral',
-                 'k_dpmpp_2s_ancestral', "k_dpmpp_2m", 'k_dpmpp_sde', "ddim"]
+                 'k_dpmpp_2s_ancestral', "k_dpmpp_2m", 'k_dpmpp_sde', "ddim_v3"]
 
 RESOLUTION_ITEMS = [
     "NORMAL",

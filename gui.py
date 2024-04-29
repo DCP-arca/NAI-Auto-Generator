@@ -393,6 +393,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
         data = self.get_data(True)
         self.save_data()
 
+        # sampler check
+        if data['sampler'] == 'ddim_v3':
+            data['sm'] = False
+            data['sm_dyn'] = False
+
         # data precheck
         data["prompt"], data["negative_prompt"] = self._preedit_prompt(
             data["prompt"], data["negative_prompt"])
