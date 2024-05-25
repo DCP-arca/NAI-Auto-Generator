@@ -50,6 +50,10 @@ def pick_imgsrc_from_foldersrc(foldersrc, index, sort_order):
     files = [file for file in os.listdir(foldersrc) if file.lower(
     ).endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
 
+    is_reset = False
+    if index != 0 and index % len(files) == 0:
+        is_reset = True
+
     # 파일들을 정렬
     if sort_order == '오름차순':
         files.sort()
@@ -58,13 +62,14 @@ def pick_imgsrc_from_foldersrc(foldersrc, index, sort_order):
     elif sort_order == '랜덤':
         random.seed(random.randint(0, 1000000))
         random.shuffle(files)
+        is_reset = False
 
     # 인덱스가 파일 개수를 초과하는 경우
     while index >= len(files):
         index -= len(files)
 
     # 정렬된 파일 리스트에서 인덱스에 해당하는 파일의 주소 반환
-    return os.path.join(foldersrc, files[index])
+    return os.path.join(foldersrc, files[index]), is_reset
 
 
 def strtobool(val):
@@ -590,20 +595,17 @@ class NAIAutoGeneratorWindow(QMainWindow):
                             self, '경고', "세팅을 불러오는데 실패했습니다.")
                         return
 
-                autogenerate_thread = AutoGenerateThread(
+                agt = AutoGenerateThread(
                     self, d.count, d.delay, d.ignore_error)
-                autogenerate_thread.autogenerate_error.connect(
-                    self._on_error_autogenerate)
-                autogenerate_thread.autogenerate_end.connect(
-                    self._on_end_autogenerate)
-                autogenerate_thread.autogenerate_result_text_dict.connect(
-                    self.set_result_text)
-                autogenerate_thread.autogenerate_on_proceed_setting_batch.connect(
-                    self.proceed_settings_batch)
-                autogenerate_thread.start()
+                agt.on_error.connect(self._on_error_autogenerate)
+                agt.on_end.connect(self._on_end_autogenerate)
+                agt.on_result_text_dict.connect(self.set_result_text)
+                agt.on_statusbar_change.connect(self.set_statusbar_text)
+                agt.on_success.connect(self._on_success_autogenerate)
+                agt.start()
 
                 self.set_autogenerate_mode(True)
-                self.autogenerate_thread = autogenerate_thread
+                self.autogenerate_thread = agt
         else:
             self._on_end_autogenerate()
 
@@ -618,6 +620,18 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.set_autogenerate_mode(False)
         self.set_statusbar_text("IDLE")
         self.refresh_anlas()
+
+    def _on_success_autogenerate(self, result_str):
+        self._on_refresh_anlas(self.nai.get_anlas() or -1)
+
+        self.image_result.set_custom_pixmap(result_str)
+
+        if self.dict_img_batch_target["img2img_foldersrc"]:
+            self.proceed_image_batch("img2img")
+        if self.dict_img_batch_target["vibe_foldersrc"]:
+            self.proceed_image_batch("vibe")
+        if self.list_settings_batch_target:
+            self.proceed_settings_batch()
 
     def set_autogenerate_mode(self, is_autogenrate):
         self.button_generate_once.setDisabled(is_autogenrate)
@@ -958,11 +972,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dict_img_batch_target[mode + "_index"] += 1
         target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
 
-        src = pick_imgsrc_from_foldersrc(
+        src, is_reset = pick_imgsrc_from_foldersrc(
             foldersrc=self.dict_img_batch_target[mode + "_foldersrc"],
             index=self.dict_img_batch_target[mode + "_index"],
             sort_order=target_group.get_folder_sort_mode()
         )
+
+        if is_reset:
+            seed = random.randint(0, 9999999999)
+            self.dict_ui_settings["seed"].setText(str(seed))
 
         self._set_image_gui(mode, src)
 
@@ -1098,10 +1116,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
 
 class AutoGenerateThread(QThread):
-    autogenerate_error = pyqtSignal(int, str)
-    autogenerate_result_text_dict = pyqtSignal(dict)
-    autogenerate_on_proceed_setting_batch = pyqtSignal()
-    autogenerate_end = pyqtSignal()
+    on_error = pyqtSignal(int, str)
+    on_result_text_dict = pyqtSignal(dict)
+    on_success = pyqtSignal(str)
+    on_end = pyqtSignal()
+    on_statusbar_change = pyqtSignal(str, list)
 
     def __init__(self, parent, count, delay, ignore_error):
         super(AutoGenerateThread, self).__init__(parent)
@@ -1124,14 +1143,14 @@ class AutoGenerateThread(QThread):
             if not temp_preserve_data_once:
                 data = parent._get_data_for_generate()
                 parent.nai.set_param_dict(data)
-                self.autogenerate_result_text_dict.emit(data)
+                self.on_result_text_dict.emit(data)
             temp_preserve_data_once = False
 
             # set status bar
             if count <= -1:
-                parent.set_statusbar_text("AUTO_GENERATING_INF")
+                self.on_statusbar_change.emit("AUTO_GENERATING_INF", [])
             else:
-                parent.set_statusbar_text("AUTO_GENERATING_COUNT", [
+                self.on_statusbar_change.emit("AUTO_GENERATING_COUNT", [
                     self.count, self.count - count + 1])
 
             # before generate, if setting batch
@@ -1150,21 +1169,11 @@ class AutoGenerateThread(QThread):
             if self.is_dead:
                 return
             if error_code == 0:
-                # same as parent.refresh_anlas()
-                parent._on_refresh_anlas(parent.nai.get_anlas() or -1)
-
-                parent.image_result.set_custom_pixmap(result_str)
-
-                if parent.dict_img_batch_target["img2img_foldersrc"]:
-                    parent.proceed_image_batch("img2img")
-                if parent.dict_img_batch_target["vibe_foldersrc"]:
-                    parent.proceed_image_batch("vibe")
-                if parent.list_settings_batch_target:
-                    self.autogenerate_on_proceed_setting_batch.emit()
+                self.on_success.emit(result_str)
             else:
                 if self.ignore_error:
                     for t in range(int(delay), 0, -1):
-                        parent.set_statusbar_text("AUTO_ERROR_WAIT", [t])
+                        self.on_statusbar_change.emit("AUTO_ERROR_WAIT", [t])
                         time.sleep(1)
                         if self.is_dead:
                             return
@@ -1172,7 +1181,7 @@ class AutoGenerateThread(QThread):
                     temp_preserve_data_once = True
                     continue
                 else:
-                    self.autogenerate_error.emit(error_code, result_str)
+                    self.on_error.emit(error_code, result_str)
                     return
 
             # 2. Wait
@@ -1180,13 +1189,13 @@ class AutoGenerateThread(QThread):
             if count != 0:
                 temp_delay = delay
                 for x in range(int(delay)):
-                    parent.set_statusbar_text("AUTO_WAIT", [temp_delay])
+                    self.on_statusbar_change.emit("AUTO_WAIT", [temp_delay])
                     time.sleep(1)
                     if self.is_dead:
                         return
                     temp_delay -= 1
 
-        self.autogenerate_end.emit()
+        self.on_end.emit()
 
     def stop(self):
         self.is_dead = True
@@ -1195,7 +1204,8 @@ class AutoGenerateThread(QThread):
 
 def _threadfunc_generate_image(thread_self, path):
     # 1 : get image
-    nai = thread_self.parent().nai
+    parent = thread_self.parent()
+    nai = parent.nai
     action = NAIAction.generate
     if nai.parameters["image"]:
         action = NAIAction.img2img
@@ -1215,14 +1225,23 @@ def _threadfunc_generate_image(thread_self, path):
 
     # 3 : save image
     create_folder_if_not_exists(path)
-    timename = datetime.datetime.now().strftime(
-        "%y%m%d_%H%M%S%f")[:-4]
-    filename = timename
-    if strtobool(thread_self.parent().settings.value("will_savename_prompt", True)):
-        filename += "_" + nai.parameters["prompt"]
-    dst = create_windows_filepath(path, filename, ".png")
-    if not dst:
-        dst = timename
+    dst = ""
+    if parent.dict_img_batch_target["img2img_foldersrc"] and strtobool(thread_self.parent().settings.value("will_savename_i2i", False)):
+        filename = get_filename_only(parent.i2i_settings_group.src)
+        extension = ".png"
+        dst = os.path.join(path, filename + extension)
+        while os.path.isfile(dst):
+            filename += "_"
+            dst = os.path.join(path, filename + extension)
+    else:
+        timename = datetime.datetime.now().strftime(
+            "%y%m%d_%H%M%S%f")[:-4]
+        filename = timename
+        if strtobool(thread_self.parent().settings.value("will_savename_prompt", True)):
+            filename += "_" + nai.parameters["prompt"]
+        dst = create_windows_filepath(path, filename, ".png")
+        if not dst:
+            dst = timename
     try:
         img.save(dst)
     except Exception as e:

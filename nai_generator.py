@@ -237,26 +237,25 @@ if __name__ == "__main__":
     if is_login_success:
         # print(naiG.get_anlas())
 
-        naiG.set_param_dict({
-            "prompt": "1girl, green eyes",
+        naiG.parameters = {
+            "prompt": "1girl",
             "negative_prompt": "bad quality",
-            "width": 512,
-            "height": 512,
+            "legacy": False,
+            "width": 640,
+            "height": 480,
+            "n_samples": 1,
+            "seed": random.randint(0, 9999999999),
+            "extra_noise_seed": -1,
+            "sampler": "k_euler_ancestral",
             "steps": 28,
-            "sampler": "ddim_v3",
-            "scale": 5.0,
-            "cfg_rescale": 0.0,
-            "sm": False,
-            "sm_dyn": False,
-            # 'mask':'',
-            # 'image':'',
-            # "image": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\target.png"),
-            # "mask": naiG.convert_src_to_imagedata(r"C:\Users\thddy\Downloads\mask.png"),
-            # "add_original_image": False,
-            "strength": 0.8,
-            "noise": 0.0,
-            # "reference_image": naiG.convert_src_to_imagedata("no_image.png")
-        })
+            "scale": 5,
+            "uncond_scale": 1.0,
+            "sm": True,
+            "sm_dyn": True,
+            "decrisper": False,
+            "cfg_rescale": 0,
+            "noise_schedule": "native",
+        }
 
         img = naiG.generate_image(action=NAIAction.generate)
         # img = naiG.generate_image(action=NAIAction.img2img)
