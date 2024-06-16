@@ -394,6 +394,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         return data
 
+    # Warning! Don't interact with pyqt gui in this function
     def _get_data_for_generate(self):
         data = self.get_data(True)
         self.save_data()
@@ -410,7 +411,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # seed pick
         if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
             data["seed"] = random.randint(0, 9999999999)
-            self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
         # wh pick
         if strtobool(self.checkbox_random_resolution.isChecked()):
@@ -418,12 +418,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if fl:
                 text = fl[random.randrange(0, len(fl))]
 
-                self.combo_resolution.setCurrentText(text)
-
                 res_text = text.split("(")[1].split(")")[0]
                 width, height = res_text.split("x")
                 data["width"], data["height"] = int(width), int(height)
 
+        ## TODO : EDIT
         # image option check
         data["image"] = None
         data["reference_image"] = None
@@ -520,12 +519,29 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         return edited_prompt, edited_nprompt
 
+    def _on_after_create_data_apply_gui(self):
+        data = self.nai.parameters
+
+        # resolution text
+        fl = self.get_now_resolution_familly_list()
+        if fl:
+            for resol in fl:
+                if str(data["width"]) in resol and str(data["height"]) in resol:
+                    self.combo_resolution.setCurrentText(resol)
+                    break
+
+        # seed text
+        self.dict_ui_settings["seed"].setText(str(data["seed"]))
+
+        # result text
+        self.set_result_text(data)
+
     def on_click_generate_once(self):
         self.list_settings_batch_target = []
 
         data = self._get_data_for_generate()
         self.nai.set_param_dict(data)
-        self.set_result_text(data)
+        self._on_after_create_data_apply_gui()
 
         generate_thread = GenerateThread(self)
         generate_thread.generate_result.connect(self._on_result_generate)
@@ -597,9 +613,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
                 agt = AutoGenerateThread(
                     self, d.count, d.delay, d.ignore_error)
+                agt.on_data_created.connect(self._on_after_create_data_apply_gui)
                 agt.on_error.connect(self._on_error_autogenerate)
                 agt.on_end.connect(self._on_end_autogenerate)
-                agt.on_result_text_dict.connect(self.set_result_text)
                 agt.on_statusbar_change.connect(self.set_statusbar_text)
                 agt.on_success.connect(self._on_success_autogenerate)
                 agt.start()
@@ -727,6 +743,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     s += f + "\n"
                 QMessageBox.information(
                     self, '이미지 크기 랜덤', "다음 크기 중 하나가 랜덤으로 선택됩니다.\n\n" + s)
+
+        self.settings.setValue("image_random_checkbox", is_checked == 2)
 
     def get_now_resolution_familly_list(self):
         family_mask = RESOLUTION_FAMILIY_MASK[self.combo_resolution.currentIndex(
@@ -997,6 +1015,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@" + mode + "@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
             return
 
+    # warning! Don't use this function in thread if with_dialog==True
     def predict_tag_from(self, filemode, target, with_dialog):
         result = ""
 
@@ -1116,8 +1135,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
 
 class AutoGenerateThread(QThread):
+    on_data_created = pyqtSignal()
     on_error = pyqtSignal(int, str)
-    on_result_text_dict = pyqtSignal(dict)
     on_success = pyqtSignal(str)
     on_end = pyqtSignal()
     on_statusbar_change = pyqtSignal(str, list)
@@ -1143,7 +1162,7 @@ class AutoGenerateThread(QThread):
             if not temp_preserve_data_once:
                 data = parent._get_data_for_generate()
                 parent.nai.set_param_dict(data)
-                self.on_result_text_dict.emit(data)
+                self.on_data_created.emit()
             temp_preserve_data_once = False
 
             # set status bar

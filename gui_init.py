@@ -123,6 +123,24 @@ def pil2pixmap(im):
     return pixmap
 
 
+def strtobool(val):
+    """Convert a string representation of truth to true (1) or false (0).
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
+    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
+    'val' is anything else.
+    """
+    if isinstance(val, bool):
+        return val
+
+    val = val.lower()
+    if val in ('y', 'yes', 't', 'true', 'on', '1'):
+        return True
+    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
+        return False
+    else:
+        raise ValueError("invalid truth value %r" % (val,))
+
+
 class ResultImageView(QLabel):
     clicked = pyqtSignal()
 
@@ -390,7 +408,7 @@ def init_prompt_layout(self):
         self, S.LABEL_PROMPT, ["add", "set", "sav"]))
 
     vbox.addWidget(create_prompt_edit(
-        self, S.LABEL_PROMPT_HINT, "prompt"), stretch=10)
+        self, S.LABEL_PROMPT_HINT, "prompt"), stretch=20)
 
     vbox.addWidget(create_empty(minimum_height=6))
 
@@ -547,6 +565,8 @@ def init_resolution_options_layout(self):
     checkbox_layout = QHBoxLayout()
     checkbox_layout.addStretch(2000)
     checkbox_random_resolution = QCheckBox("이미지 크기 랜덤")
+    prev_value_checkbox = strtobool(self.settings.value("image_random_checkbox", False))
+    checkbox_random_resolution.setChecked(prev_value_checkbox)
     checkbox_layout.addWidget(checkbox_random_resolution)
     checkbox_random_resolution.stateChanged.connect(
         self.on_random_resolution_checked)
