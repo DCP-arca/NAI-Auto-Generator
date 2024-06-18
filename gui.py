@@ -186,10 +186,10 @@ def convert_qimage_to_imagedata(qimage):
 
 
 class NAIAutoGeneratorWindow(QMainWindow):
-
     def __init__(self, app):
         super().__init__()
         self.app = app
+
         self.init_variable()
         self.init_window()
         self.init_statusbar()
@@ -197,11 +197,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_content()
         self.load_data()
         self.check_folders()
+        self.apply_theme()
         self.show()
 
         self.init_nai()
         self.init_wc()
         self.init_tagger()
+
+    def apply_theme(self):
+        font_size = self.settings.value("nag_font_size", 18)
+        self.app.setStyleSheet("QWidget{font-size:" + str(font_size) + "px}")
 
     def init_variable(self):
         self.is_expand = False
@@ -613,7 +618,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
                 agt = AutoGenerateThread(
                     self, d.count, d.delay, d.ignore_error)
-                agt.on_data_created.connect(self._on_after_create_data_apply_gui)
+                agt.on_data_created.connect(
+                    self._on_after_create_data_apply_gui)
                 agt.on_error.connect(self._on_error_autogenerate)
                 agt.on_end.connect(self._on_end_autogenerate)
                 agt.on_statusbar_change.connect(self.set_statusbar_text)

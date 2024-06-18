@@ -1,6 +1,6 @@
 import os
 import sys
-from PyQt5.QtWidgets import QApplication, QRadioButton, QTextEdit, QGroupBox, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
+from PyQt5.QtWidgets import QApplication, QRadioButton, QTextEdit, QSlider, QGroupBox, QWidget, QFrame, QFileDialog, QLabel, QLineEdit, QCheckBox, QGridLayout, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox, QFileSystemModel, QListView, QSizePolicy
 from PyQt5.QtGui import QImage, QPainter, QPixmap
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QEvent, QRectF, QSize, pyqtSignal, QTimer
 
@@ -414,6 +414,22 @@ class OptionDialog(QDialog):
 
         layout.addWidget(create_empty(minimum_height=6))
 
+        font_layout = QHBoxLayout()
+        layout.addLayout(font_layout)
+
+        now_font_size = self.parent().settings.value("nag_font_size", 18)
+        font_label = QLabel(f'글꼴 크기(종료시 적용, 기본 18): {now_font_size}')
+        self.font_label = font_label
+        font_layout.addWidget(font_label)
+
+        font_progress_bar = QSlider(self)
+        font_progress_bar.setMinimum(14)
+        font_progress_bar.setMaximum(50)
+        font_progress_bar.setValue(now_font_size)
+        font_progress_bar.setOrientation(Qt.Horizontal)
+        font_progress_bar.valueChanged.connect(self.on_fontlabel_updated)
+        font_layout.addWidget(font_progress_bar)
+
         checkbox_savepname = QCheckBox("파일 생성시 이름에 프롬프트 넣기")
         checkbox_savepname.setChecked(strtobool(
             parent.settings.value("will_savename_prompt", True)))
@@ -438,6 +454,10 @@ class OptionDialog(QDialog):
         layout.addLayout(qhl_close)
 
         self.setLayout(layout)
+
+    def on_fontlabel_updated(self, value):
+        self.font_label.setText(f'폰트 사이즈(종료시 적용, 기본 18): {value}')
+        self.parent().settings.setValue("nag_font_size", int(value))
 
     def on_click_select_button(self, code):
         select_dialog = QFileDialog()

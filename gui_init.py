@@ -565,7 +565,8 @@ def init_resolution_options_layout(self):
     checkbox_layout = QHBoxLayout()
     checkbox_layout.addStretch(2000)
     checkbox_random_resolution = QCheckBox("이미지 크기 랜덤")
-    prev_value_checkbox = strtobool(self.settings.value("image_random_checkbox", False))
+    prev_value_checkbox = strtobool(
+        self.settings.value("image_random_checkbox", False))
     checkbox_random_resolution.setChecked(prev_value_checkbox)
     checkbox_layout.addWidget(checkbox_random_resolution)
     checkbox_random_resolution.stateChanged.connect(
@@ -1041,24 +1042,22 @@ def init_buttons_layout(self):
         font-weight: bold;
         background-color:#00000000;
         border: 1px solid white;
+        padding: 8px;
     """
     button_getter = QPushButton("Info")
     hbox_expand.addWidget(button_getter)
     button_getter.clicked.connect(self.on_click_getter)
     button_getter.setStyleSheet(stylesheet_button)
-    button_getter.setFixedSize(QSize(50, 30))
 
     button_tagger = QPushButton("Tag")
     hbox_expand.addWidget(button_tagger)
     button_tagger.clicked.connect(self.on_click_tagger)
     button_tagger.setStyleSheet(stylesheet_button)
-    button_tagger.setFixedSize(QSize(50, 30))
 
     button_expand = QPushButton("<<")
     hbox_expand.addWidget(button_expand)
     button_expand.clicked.connect(self.on_click_expand)
     button_expand.setStyleSheet(stylesheet_button)
-    button_expand.setFixedSize(QSize(50, 30))
     self.button_expand = button_expand
 
     return main_layout
@@ -1080,11 +1079,11 @@ def init_openfolder_group(self,):
     openfolder_group.setLayout(buttons_layout)
 
     add_button(buttons_layout, "생성 결과",
-               lambda: self.on_click_open_folder("path_results"), 100)
+               lambda: self.on_click_open_folder("path_results"))
     add_button(buttons_layout, "와일드 카드",
-               lambda: self.on_click_open_folder("path_wildcards"), 115)
+               lambda: self.on_click_open_folder("path_wildcards"))
     add_button(buttons_layout, "세팅 파일",
-               lambda: self.on_click_open_folder("path_settings"), 100)
+               lambda: self.on_click_open_folder("path_settings"))
     # add_button(buttons_layout, "P",
     #            lambda: self.on_click_open_folder("path_prompts"), 40, 40, 25)
     # add_button(buttons_layout, "NP",
