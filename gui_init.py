@@ -10,6 +10,7 @@ from PIL import Image
 from consts import COLOR, S
 
 from gui_paint_dialog import InpaintDialog
+from completer import CompletionTextEdit
 
 ########################################################
 
@@ -392,7 +393,7 @@ def init_prompt_layout(self):
         return hbox_prompt_title
 
     def create_prompt_edit(self, placeholder_text, code):
-        textedit = QTextEdit()
+        textedit = CompletionTextEdit()
         textedit.setPlaceholderText(placeholder_text)
         textedit.setAcceptRichText(False)
         textedit.setAcceptDrops(False)

@@ -50,6 +50,8 @@ class DEFAULT_VALUE:
     AMOUNT_WAIT_WHEN_ERROR_OCCUR = 1
 
 
+DEFAULT_TAGCOMPLETION_PATH = "danbooru_tags_post_count.csv"
+
 DEFAULT_PATH = {
     "path_results": "results/",
     "path_wildcards": "wildcards/",

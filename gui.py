@@ -13,11 +13,10 @@ from urllib import request
 
 from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
 from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QBuffer
-from PyQt5.QtGui import QImage
 from gui_init import init_main_widget
 from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
 
-from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict
+from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH
 
 import naiinfo_getter
 from nai_generator import NAIGenerator, NAIAction
@@ -203,6 +202,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_nai()
         self.init_wc()
         self.init_tagger()
+        self.init_completion()
 
     def apply_theme(self):
         font_size = self.settings.value("nag_font_size", 18)
@@ -315,6 +315,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dtagger = DanbooruTagger(self.settings.value(
             "path_models", os.path.abspath(DEFAULT_PATH["path_models"])))
 
+    def init_completion(self):
+        if strtobool(self.settings.value("will_complete_tag", True)):
+            generate_thread = CompletionTagLoadThread(self)
+            generate_thread.on_load_completiontag_sucess.connect(
+                self._on_load_completiontag_sucess)
+            generate_thread.start()
+
     def save_data(self):
         data_dict = self.get_data()
 
@@ -360,6 +367,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         for key, default_path in DEFAULT_PATH.items():
             path = self.settings.value(key, os.path.abspath(default_path))
             create_folder_if_not_exists(path)
+
+    def _on_load_completiontag_sucess(self, tag_list):
+        if tag_list:
+            target_code = ["prompt", "negative_prompt"]
+            for code in target_code:
+                self.dict_ui_settings[code].start_complete_mode(tag_list)
 
     def get_data(self, do_convert_type=False):
         data = {
@@ -1138,6 +1151,26 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.close()
         self.app.closeAllWindows()
         QCoreApplication.exit(0)
+
+
+class CompletionTagLoadThread(QThread):
+    on_load_completiontag_sucess = pyqtSignal(list)
+
+    def __init__(self, parent):
+        super(CompletionTagLoadThread, self).__init__(parent)
+
+    def run(self):
+        try:
+            with open(DEFAULT_TAGCOMPLETION_PATH, "r", encoding='utf8') as f:
+                tag_list = f.readlines()
+                if tag_list:
+                    self.on_load_completiontag_sucess.emit(tag_list)
+        except Exception:
+            pass
+
+    def stop(self):
+        self.is_dead = True
+        self.quit()
 
 
 class AutoGenerateThread(QThread):

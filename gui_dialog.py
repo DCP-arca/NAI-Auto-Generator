@@ -430,6 +430,12 @@ class OptionDialog(QDialog):
         font_progress_bar.valueChanged.connect(self.on_fontlabel_updated)
         font_layout.addWidget(font_progress_bar)
 
+        checkbox_completeoff = QCheckBox("태그 자동완성 끄기(저사양용)")
+        checkbox_completeoff.setChecked(strtobool(
+            parent.settings.value("will_complete_tag", True)))
+        self.checkbox_completeoff = checkbox_completeoff
+        layout.addWidget(checkbox_completeoff)
+
         checkbox_savepname = QCheckBox("파일 생성시 이름에 프롬프트 넣기")
         checkbox_savepname.setChecked(strtobool(
             parent.settings.value("will_savename_prompt", True)))
@@ -495,6 +501,8 @@ class OptionDialog(QDialog):
         self.dict_label_loc[code].setText(path)
 
     def on_click_close_button(self):
+        self.parent().settings.setValue(
+            "will_complete_tag", self.checkbox_completeoff.isChecked())
         self.parent().settings.setValue(
             "will_savename_prompt", self.checkbox_savepname.isChecked())
         self.parent().settings.setValue(
