@@ -11,7 +11,9 @@ pyinstaller --noconfirm --windowed --icon "D:/Dev/Workspace/Python/NAI-Auto-Gene
 xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\Info Getter\" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\" /s /e /y
 xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\Tagger\" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\" /s /e /y
 xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\NAI Auto Generator\" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\" /s /e /y
-xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\danbooru_tags_post_count.csv" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\danbooru_tags_post_count.csv" /Y
+
+xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\danbooru_tags_post_count.csv" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\" /Y /Q /R
+xcopy "D:\Dev\Workspace\Python\NAI-Auto-Generator\danbooru_tags_post_count.csv" "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist_onefile\" /Y /Q /R
 
 rd /s /q "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\Info Getter"
 rd /s /q "D:\Dev\Workspace\Python\NAI-Auto-Generator\dist\Tagger"
