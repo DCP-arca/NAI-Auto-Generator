@@ -50,28 +50,30 @@ class CompletionTextEdit(QTextEdit):
                     return
 
             super().keyPressEvent(event)
+            
             ctrlOrShift = event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier)
             if ctrlOrShift and event.text() == '':
                 return
 
-            # eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
-            eow = "{},<>|@"
-            hasModifier = (event.modifiers() !=
-                           Qt.NoModifier) and not ctrlOrShift
-            completionPrefix = self.textUnderCursor()
+            if event.text():
+                # eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
+                eow = "{},<>|@"
+                hasModifier = (event.modifiers() !=
+                               Qt.NoModifier) and not ctrlOrShift
+                completionPrefix = self.textUnderCursor()
 
-            if not self.completer or (hasModifier and event.text() == '') or len(completionPrefix) < 1 or event.text()[-1] in eow:
-                self.completer.popup().hide()
-                return
+                if not self.completer or (hasModifier and event.text() == '') or len(completionPrefix) < 1 or event.text()[-1] in eow:
+                    self.completer.popup().hide()
+                    return
 
-            if completionPrefix != self.completer.completionPrefix():
-                self.completer.setCompletionPrefix(completionPrefix)
-                self.completer.popup().setCurrentIndex(
-                    self.completer.completionModel().index(0, 0))
+                if completionPrefix != self.completer.completionPrefix():
+                    self.completer.setCompletionPrefix(completionPrefix)
+                    self.completer.popup().setCurrentIndex(
+                        self.completer.completionModel().index(0, 0))
 
-            cr = self.cursorRect()
-            cr.setWidth(self.completer.popup().sizeHintForColumn(
-                0) + self.completer.popup().verticalScrollBar().sizeHint().width())
-            self.completer.complete(cr)
+                cr = self.cursorRect()
+                cr.setWidth(self.completer.popup().sizeHintForColumn(
+                    0) + self.completer.popup().verticalScrollBar().sizeHint().width())
+                self.completer.complete(cr)
         else:
             super().keyPressEvent(event)
