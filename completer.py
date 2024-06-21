@@ -3,16 +3,44 @@ from PyQt5.QtGui import QTextCursor
 from PyQt5.QtCore import Qt, QStringListModel
 
 
+class CustomCompleter(QCompleter):
+    def __init__(self, words, parent=None):
+        super().__init__(words, parent)
+        self.words = words
+        self.setCaseSensitivity(Qt.CaseInsensitive)
+        self.setFilterMode(Qt.MatchContains)
+        self.model = QStringListModel(words, self)
+        self.setModel(self.model)
+
+    def setCompletionPrefix(self, prefix):
+        self.prefix = prefix
+
+        is_add_mode = len(self.prefix) > 3
+        prefix_lower = self.prefix.lower()
+        filtered_words = []
+        contains_matches = []
+        for word in self.words:
+            word_lower = word.lower()
+            if word_lower.startswith(prefix_lower):
+                filtered_words.append(word)
+            elif is_add_mode and prefix_lower in word_lower:
+                contains_matches.append(word)
+
+        if is_add_mode:
+            filtered_words.extend(sorted(contains_matches))
+
+        self.model.setStringList(filtered_words)
+        super().setCompletionPrefix(prefix)
+        self.complete()
+
+
 class CompletionTextEdit(QTextEdit):
     def __init__(self):
         super().__init__()
         self.completer = None
 
     def start_complete_mode(self, tag_list):
-        model = QStringListModel()
-        model.setStringList(tag_list)
-        completer = QCompleter()
-        completer.setModel(model)
+        completer = CustomCompleter(tag_list)
 
         self.setCompleter(completer)
 
@@ -50,7 +78,7 @@ class CompletionTextEdit(QTextEdit):
                     return
 
             super().keyPressEvent(event)
-            
+
             ctrlOrShift = event.modifiers() & (Qt.ControlModifier | Qt.ShiftModifier)
             if ctrlOrShift and event.text() == '':
                 return
