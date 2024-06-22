@@ -217,13 +217,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dict_img_batch_target = {
             "img2img_foldersrc": "",
             "img2img_index": -1,
+            "i2i_last_src": "",
+            "i2i_last_dst": "",
             "vibe_foldersrc": "",
-            "vibe_index": -1
+            "vibe_index": -1,
+            "vibe_last_src": "",
+            "vibe_last_dst": "",
         }
-        self.i2i_last_generated_target = ""
-        self.i2i_last_generated_result = ""
-        self.vibe_last_generated_target = ""
-        self.vibe_last_generated_result = ""
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
@@ -440,7 +440,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 width, height = res_text.split("x")
                 data["width"], data["height"] = int(width), int(height)
 
-        ## TODO : EDIT
         # image option check
         data["image"] = None
         data["reference_image"] = None
@@ -469,41 +468,28 @@ class NAIAutoGeneratorWindow(QMainWindow):
             else:
                 self.vibe_settings_group.on_click_removebutton()
 
-        # image tag check
-        if self.i2i_settings_group.tagcheck_checkbox.isChecked():
-            if self.i2i_settings_group.src:
-                if self.i2i_last_generated_target != self.i2i_settings_group.src:
-                    self.i2i_last_generated_target = self.i2i_settings_group.src
-                    self.i2i_last_generated_result = self.predict_tag_from(
-                        "src", self.i2i_settings_group.src, False)
-                    if not self.i2i_last_generated_result:
-                        self.i2i_last_generated_target = ""
-                        self.i2i_last_generated_result = ""
+        # i2i 와 vibe 세팅
+        batch = self.dict_img_batch_target
+        for mode_str in ["i2i", "vibe"]:
+            target_group = self.i2i_settings_group if mode_str == "i2i" else self.vibe_settings_group
 
-                data["prompt"] = inject_imagetag(
-                    data["prompt"], "img2img", self.i2i_last_generated_result)
-                data["negative_prompt"] = inject_imagetag(
-                    data["negative_prompt"], "img2img", self.i2i_last_generated_result)
-        else:
-            self.i2i_last_generated_target = ""
-            self.i2i_last_generated_result = ""
-        if self.vibe_settings_group.tagcheck_checkbox.isChecked():
-            if self.vibe_settings_group.src:
-                if self.vibe_last_generated_target != self.vibe_settings_group.src:
-                    self.vibe_last_generated_target = self.vibe_settings_group.src
-                    self.vibe_last_generated_result = self.predict_tag_from(
-                        "src", self.vibe_settings_group.src, False)
-                    if not self.vibe_last_generated_result:
-                        self.vibe_last_generated_target = ""
-                        self.vibe_last_generated_result = ""
+            if target_group.tagcheck_checkbox.isChecked():
+                if target_group.src:
+                    if batch[mode_str + "_last_src"] != target_group.src:
+                        batch[mode_str + "_last_src"] = target_group.src
+                        batch[mode_str + "_last_dst"] = self.predict_tag_from(
+                            "src", target_group.src, False)
+                        if not batch[mode_str + "_last_dst"]:
+                            batch[mode_str + "_last_src"] = ""
+                            batch[mode_str + "_last_dst"] = ""
 
-                data["prompt"] = inject_imagetag(
-                    data["prompt"], "vibe", self.vibe_last_generated_result)
-                data["negative_prompt"] = inject_imagetag(
-                    data["negative_prompt"], "vibe", self.vibe_last_generated_result)
-        else:
-            self.vibe_last_generated_target = ""
-            self.vibe_last_generated_result = ""
+                    data["prompt"] = inject_imagetag(
+                        data["prompt"], "img2img" if mode_str == "i2i" else "vibe", batch[mode_str + "_last_dst"])
+                    data["negative_prompt"] = inject_imagetag(
+                        data["negative_prompt"], "img2img" if mode_str == "i2i" else "vibe", batch[mode_str + "_last_dst"])
+            else:
+                batch[mode_str + "_last_src"] = ""
+                batch[mode_str + "_last_dst"] = ""
 
         return data
 
@@ -880,10 +866,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
         if 'reference_image' in nai_dict and nai_dict['reference_image']:
             additional_dict["reference_image_src"] = self.vibe_settings_group.src or ""
 
-        if self.i2i_last_generated_result:
-            additional_dict["image_tag"] = self.i2i_last_generated_result
-        if self.vibe_last_generated_result:
-            additional_dict["reference_image_tag"] = self.vibe_last_generated_result
+        if self.dict_img_batch_target["i2i_last_dst"]:
+            additional_dict["image_tag"] = self.dict_img_batch_target["i2i_last_dst"]
+        if self.dict_img_batch_target["vibe_last_dst"]:
+            additional_dict["reference_image_tag"] = self.dict_img_batch_target["vibe_last_dst"]
 
         content = prettify_naidict(nai_dict, additional_dict)
 
