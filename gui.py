@@ -544,7 +544,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         fl = self.get_now_resolution_familly_list()
         if fl:
             for resol in fl:
-                if str(data["width"]) in resol and str(data["height"]) in resol:
+                if str(data["width"]) + "x" + str(data["height"]) in resol:
                     self.combo_resolution.setCurrentText(resol)
                     break
 
