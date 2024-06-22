@@ -1,5 +1,5 @@
 from PyQt5.QtWidgets import QCompleter, QTextEdit
-from PyQt5.QtGui import QTextCursor
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QFont, QColor
 from PyQt5.QtCore import Qt, QStringListModel
 
 
@@ -38,6 +38,50 @@ class CompletionTextEdit(QTextEdit):
     def __init__(self):
         super().__init__()
         self.completer = None
+        self.textChanged.connect(self.highlightBrackets)
+
+    def highlightBrackets(self):
+        self.blockSignals(True)  # 텍스트 변경 중 신호 비활성화
+        cursor = self.textCursor()
+        text = self.toPlainText()
+
+        # Clear previous formatting
+        cursor.select(cursor.Document)
+        clear_format = QTextCharFormat()
+        cursor.setCharFormat(clear_format)
+
+        # Stack to keep track of open brackets
+        stack = []
+        bracket_pairs = {'(': ')', '{': '}', '[': ']', '<': '>'}
+        open_brackets = bracket_pairs.keys()
+        close_brackets = bracket_pairs.values()
+
+        # Dictionary to keep track of bracket positions
+        bracket_positions = {}
+        for i, char in enumerate(text):
+            if char in open_brackets:
+                stack.append((char, i))
+                bracket_positions[i] = -1  # 기본 값으로 -1 설정
+            elif char in close_brackets:
+                if stack and bracket_pairs[stack[-1][0]] == char:
+                    open_bracket, open_pos = stack.pop()
+                    bracket_positions[open_pos] = i
+                    bracket_positions[i] = open_pos
+                else:
+                    bracket_positions[i] = -1
+
+        # Highlight unmatched brackets
+        fmt = QTextCharFormat()
+        fmt.setFontWeight(QFont.Bold)
+        fmt.setForeground(QColor("red"))
+        cursor.beginEditBlock()
+        for pos, matching_pos in bracket_positions.items():
+            if matching_pos == -1:
+                cursor.setPosition(pos)
+                cursor.movePosition(cursor.NextCharacter, cursor.KeepAnchor)
+                cursor.setCharFormat(fmt)
+        cursor.endEditBlock()
+        self.blockSignals(False)  # 텍스트 변경 후 신호 활성화
 
     def start_complete_mode(self, tag_list):
         completer = CustomCompleter(tag_list)
