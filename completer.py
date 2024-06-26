@@ -1,6 +1,9 @@
 from PyQt5.QtWidgets import QCompleter, QTextEdit
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QFont, QColor
 from PyQt5.QtCore import Qt, QStringListModel
+import string
+
+complete_target_stringset = string.ascii_letters + string.digits + "~!#$%^&*_+?.-="
 
 
 class CustomCompleter(QCompleter):
@@ -45,11 +48,6 @@ class CompletionTextEdit(QTextEdit):
         cursor = self.textCursor()
         text = self.toPlainText()
 
-        # Clear previous formatting
-        cursor.select(cursor.Document)
-        clear_format = QTextCharFormat()
-        cursor.setCharFormat(clear_format)
-
         # Stack to keep track of open brackets
         stack = []
         bracket_pairs = {'(': ')', '{': '}', '[': ']', '<': '>'}
@@ -74,13 +72,14 @@ class CompletionTextEdit(QTextEdit):
         fmt = QTextCharFormat()
         fmt.setFontWeight(QFont.Bold)
         fmt.setForeground(QColor("red"))
-        cursor.beginEditBlock()
+
+        cursor.beginEditBlock()  # Undo block 시작
         for pos, matching_pos in bracket_positions.items():
             if matching_pos == -1:
                 cursor.setPosition(pos)
                 cursor.movePosition(cursor.NextCharacter, cursor.KeepAnchor)
                 cursor.setCharFormat(fmt)
-        cursor.endEditBlock()
+        cursor.endEditBlock()  # Undo block 종료
         self.blockSignals(False)  # 텍스트 변경 후 신호 활성화
 
     def start_complete_mode(self, tag_list):
@@ -127,7 +126,7 @@ class CompletionTextEdit(QTextEdit):
             if ctrlOrShift and event.text() == '':
                 return
 
-            if event.text():
+            if event.text() in complete_target_stringset:
                 # eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
                 eow = "{},<>|@"
                 hasModifier = (event.modifiers() !=
