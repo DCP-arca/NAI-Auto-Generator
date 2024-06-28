@@ -3,7 +3,7 @@ from PyQt5.QtGui import QTextCursor, QTextCharFormat, QFont, QColor
 from PyQt5.QtCore import Qt, QStringListModel
 import string
 
-complete_target_stringset = string.ascii_letters + string.digits + "~!#$%^&*_+?.-="
+# complete_target_stringset = string.ascii_letters + string.digits + "~!#$%^&*_+?.-="
 
 
 class CustomCompleter(QCompleter):
@@ -126,7 +126,7 @@ class CompletionTextEdit(QTextEdit):
             if ctrlOrShift and event.text() == '':
                 return
 
-            if event.text() in complete_target_stringset:
+            if event.text():
                 # eow = "~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-="
                 eow = "{},<>|@"
                 hasModifier = (event.modifiers() !=
