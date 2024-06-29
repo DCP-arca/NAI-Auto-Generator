@@ -42,10 +42,7 @@ class CompletionTextEdit(QTextEdit):
         super().__init__()
         self.completer = None
         self.textChanged.connect(self.highlightBrackets)
-
     def highlightBrackets(self):
-        self.blockSignals(True)  # 텍스트 변경 중 신호 비활성화
-        cursor = self.textCursor()
         text = self.toPlainText()
 
         # Stack to keep track of open brackets
@@ -69,18 +66,22 @@ class CompletionTextEdit(QTextEdit):
                     bracket_positions[i] = -1
 
         # Highlight unmatched brackets
-        fmt = QTextCharFormat()
-        fmt.setFontWeight(QFont.Bold)
-        fmt.setForeground(QColor("red"))
+        extraSelections = []
+        unmatched_format = QTextCharFormat()
+        unmatched_format.setFontWeight(QFont.Bold)
+        unmatched_format.setForeground(QColor("red"))
 
-        cursor.beginEditBlock()  # Undo block 시작
         for pos, matching_pos in bracket_positions.items():
             if matching_pos == -1:
+                selection = QTextEdit.ExtraSelection()
+                selection.format = unmatched_format
+                cursor = self.textCursor()
                 cursor.setPosition(pos)
-                cursor.movePosition(cursor.NextCharacter, cursor.KeepAnchor)
-                cursor.setCharFormat(fmt)
-        cursor.endEditBlock()  # Undo block 종료
-        self.blockSignals(False)  # 텍스트 변경 후 신호 활성화
+                cursor.movePosition(QTextCursor.NextCharacter, QTextCursor.KeepAnchor)
+                selection.cursor = cursor
+                extraSelections.append(selection)
+
+        self.setExtraSelections(extraSelections)
 
     def start_complete_mode(self, tag_list):
         completer = CustomCompleter(tag_list)
