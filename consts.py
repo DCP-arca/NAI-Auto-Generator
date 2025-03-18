@@ -1,153 +1,155 @@
-def prettify_naidict(nai_dict, additional_dict={}):
-    d = nai_dict
-    ad = additional_dict
+import json
 
-    content = f"""프롬프트 :
-{d['prompt']}
+COLOR = type('COLOR', (), {
+    'BUTTON_CUSTOM': '#559977',
+    'BUTTON_AUTOGENERATE': '#D37493',
+    'LABEL_SUCCESS': '#559977',
+    'LABEL_FAILED': '#D37493',
+})
 
-네거티브 프롬프트 :
-{d['negative_prompt']}
+# RESOLUTION_FAMILIY_MASK와 RESOLUTION_FAMILIY 업데이트
+RESOLUTION_FAMILIY_MASK = [0, 0, 0, 0, -1]
 
-이미지 크기 :
-    가로 {d['width']}, 세로 {d['height']}
-
-옵션 :
-    scale : {d['scale']}
-    sampler : {d['sampler']}
-    seed : {d['seed']}
-    cfg_rescale : {d['cfg_rescale']}
-    uncond_scale : {d['uncond_scale']}
-    sm : {d['sm']}
-    sm_dyn : {d['sm_dyn']}"""
-
-    if 'image' in d and d['image']:
-        content += "\n\nI2I 모드 :\n" + (f"    target : {ad['image_src']}\n" if (
-            'image_src' in ad and ad['image_src']) else '') + f"""    strength : {d['strength']}
-    noise : {d['noise']}"""
-        if 'mask' in d and d['mask']:
-            content += "\n    Inpaint 모드 적용"
-
-    if 'reference_image' in d and d['reference_image']:
-        content += "\n\n바이브 트랜스퍼 :\n" + (f"    target : {ad['reference_image_src']}\n" if (
-            'reference_image_src' in ad and ad['reference_image_src']) else '') + f"""    reference_information_extracted : {d['reference_information_extracted']}
-    reference_strength : {d['reference_strength']}"""
-
-    if 'image' in d and d['image']:
-        if 'image_tag' in ad and ad['image_tag']:
-            content += f"""\n
-@@img2img@@ tag :
-    {ad['image_tag']}"""
-    if 'reference_image' in d and d['reference_image']:
-        if 'reference_image_tag' in ad and ad['reference_image_tag']:
-            content += f"""\n
-@@vibe@@ tag :
-    {ad['reference_image_tag']}"""
-
-    return content
-
-
-class DEFAULT_VALUE:
-    AMOUNT_WAIT_WHEN_ERROR_OCCUR = 1
-
-
-DEFAULT_TAGCOMPLETION_PATH = "danbooru_tags_post_count.csv"
-
-DEFAULT_PATH = {
-    "path_results": "results/",
-    "path_wildcards": "wildcards/",
-    "path_settings": "settings/",
-    "path_models": "models/"
+RESOLUTION_FAMILIY = {
+    0: ["Square (1024x1024)", "Portrait (832x1216)", "Landscape (1216x832)"],  # 기본 해상도 모음 (HD 먼저)
+    1: ["Square (1472x1472)", "Portrait (1024x1536)", "Landscape (1536x1024)"],  # 더 높은 해상도
+    2: ["Portrait (1088x1920)", "Landscape (1920x1088)"],  # 와이드 해상도
+    3: ["Square (640x640)", "Portrait (512x768)", "Landscape (768x512)"],  # 작은 해상도
+    4: []  # 커스텀을 위한 빈 항목
 }
 
-DEFAULT_PARAMS = {
-    "prompt": "",
-    "negative_prompt": "",
-    "width": 640,
-    "height": 640,
-    "seed": -1,
-    "extra_noise_seed": -1,
-    "sampler": "k_euler_ancestral",
-    "steps": 28,
-    "sm": True,
-    "sm_dyn": True,
-    "scale": 5,
-    "cfg_rescale": 0,
-    "uncond_scale": 1.0,
-    "strength": 0.7,
-    "noise": 0.0,
-    "reference_information_extracted": 1.0,
-    "reference_strength": 0.6,
-}
-
-DEFAULT_SETTING = {'prompt': '1girl, {aris_{{blue_archive}}}, {Character:Tendou Aris{{Blue Archive}}}, {{{chibi}}}, ?, question mark, {grab a pencil}, white eyes, white background, simple background, {looking at viewer}, oversimplified, {{icon}}, best quality, amazing quality, very aesthetic, absurdres', 'negative_prompt':
-                   'nsfw, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract], smile, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract], {{{{{{closed eyes, worst quality, bad quality, buzzcut, pov, text, censored}}}}}}, {{{{bad hands}}}}, {{{bad eyes}}}, {{{undetailed eyes}}}}, text, error, extra digit, fewer digits, jpeg artifacts, signature, watermark, username, reference, {{unfinished}}, {{unclear fingertips}}, {{twist}}, {{Squiggly}}, {{Grumpy}} , {{incomplete}}, {{Imperfect Fingers}}, condom, Disorganized colors ,Cheesy, {{very displeasing}}, {{mess}}, {{Approximate}}, {{Sloppiness}}, Glazed eyes, Glasses, watermark, username, text, signature', 'width': 640, 'height': 640, 'sampler': 'k_euler_ancestral', 'steps': 28, 'seed': 177879407, 'scale': 5.0, 'cfg_rescale': 0.0, 'sm': True, 'sm_dyn': True, 'uncond_scale': 1.0}
+# consts.py 파일에서
+DEFAULT_TAGCOMPLETION_PATH = "./danbooru_tags_post_count.csv"  # 상대 경로로 설정
 
 
-class COLOR:
-    GRAY = "#7A7A7A"
-    BRIGHT = "#212335"
-    MIDIUM = "#1A1C2E"
-    DARK = "#101224"
-    BUTTON = "#F5F3C2"
-    BUTTON_DSIABLED = "#999682"
-    BUTTON_AUTOGENERATE = "#F5B5B5"
+def prettify_naidict(d, additional_dict=None):
+    prompt = d.get('prompt', '')
+    negative_prompt = d.get('negative_prompt', '')
+
+    try:
+        # 기본 정보
+        result = (
+            f"Description: {d.get('prompt', '')}\n"
+            f"Software: NovelAI\n"
+            f"Source: NovelAI Diffusion V4 (NAI Diffusion V4 Full)\n"
+            f"Request Type: {'Image to Image' if d.get('image') else 'Text to Image'}\n\n"
+            f"Raw Parameters\n"
+            f"Prompt: {d.get('prompt', '')}\n"
+            f"Undesired Content: {d.get('negative_prompt', '')}\n"
+        )
+        
+        # 캐릭터 프롬프트가 있는 경우 추가 정보
+        if 'characterPrompts' in d and d['characterPrompts']:
+            result += f"\n■ 캐릭터 프롬프트\n"
+            for i, char in enumerate(d['characterPrompts']):
+                if isinstance(char, dict):
+                    result += f"캐릭터 {i+1}: {char.get('prompt', '정보 없음')}\n"
+                    if 'negative_prompt' in char and char['negative_prompt'].strip():
+                        result += f"  네거티브: {char['negative_prompt']}\n"
+                    if 'position' in char:
+                        result += f"  위치: ({char['position'][0]:.1f}, {char['position'][1]:.1f})\n"
+        
+        # 기술적 정보 추가
+        result += (
+            f"Resolution: {d['width']}x{d['height']}\n"
+            f"Seed: {d['seed']}\n"
+            f"Steps: {d['steps']}\n"
+            f"Sampler: {d['sampler']} (karras)\n"
+            f"Prompt Guidance: {d['scale']}\n"
+            f"Prompt Guidance Rescale: {d['cfg_rescale']}\n"
+            f"Undesired Content Strength: {d.get('uncond_scale', 0)}\n"
+        )
+        
+        # 추가 옵션 정보
+        result += (
+            f"Auto SMEA: {'On' if d.get('autoSmea', False) else 'Off'}\n"
+            f"Dynamic Thresholding: {'On' if d.get('dynamic_thresholding', False) else 'Off'}\n"
+            f"Quality Toggle: {'On' if d.get('quality_toggle', True) else 'Off'}\n"
+            f"Anti-Artifacts: {d.get('anti_artifacts', 0.0)}\n"
+            f"V4 Model Preset: {d.get('v4_model_preset', 'Artistic')}\n"
+        )
+    except KeyError as e:
+        result = f"키를 찾을 수 없습니다: {e}"
+        return result
+
+    # 이미지/레퍼런스 이미지가 있는 경우 추가 정보
+    if 'image' in d and d['image']:
+        result += f"\n■ 이미지\n"
+        result += f"이미지 경로: {additional_dict.get('image_src', '정보 없음') if additional_dict else '정보 없음'}\n"
+        result += f"이미지 변환 강도: {d.get('strength', 0.7)}\n"
+        result += f"이미지 노이즈: {d.get('noise', 0.0)}\n"
+        if additional_dict and 'image_tag' in additional_dict:
+            result += f"이미지 태그: {additional_dict['image_tag']}\n"
+
+    if 'reference_image' in d and d['reference_image']:
+        result += f"\n■ 참조 이미지\n"
+        result += f"참조 이미지 경로: {additional_dict.get('reference_image_src', '정보 없음') if additional_dict else '정보 없음'}\n"
+        result += f"참조 이미지 강도: {d.get('reference_strength', 0.6)}\n"
+        result += f"참조 정보 추출: {d.get('reference_information_extracted', 1.0)}\n"
+        if additional_dict and 'reference_image_tag' in additional_dict:
+            result += f"참조 이미지 태그: {additional_dict['reference_image_tag']}\n"
+
+    return result
+
+
+def prettify_dict(d):
+    return json.dumps(d, sort_keys=True, indent=4)
 
 
 class S:
     LIST_STATSUBAR_STATE = {
-        "BEFORE_LOGIN": "로그인이 필요합니다",
-        "LOGGINGIN": "로그인 시도중...",
-        "LOGINED": "로그인 성공.",
+        "BEFORE_LOGIN": "로그인이 필요합니다.",
+        "LOGGINGIN": "로그인 중...",
+        "LOGINED": "로그인 완료. 이제 생성이 가능합니다.",
+        "GENEARTING": "이미지를 생성하는 중...",
         "IDLE": "대기 중",
-        "GENEARTING": "생성 요청 중...",
-        "LOADING": "불러오는 중...",
-        "LOAD_COMPLETE": "불러오기 완료",
-        "AUTO_GENERATING_COUNT": "자동생성 중... 총 {}장 중 {}번째",
-        "AUTO_GENERATING_INF": "자동생성 중...",
-        "AUTO_ERROR_WAIT": "생성 중 에러가 발생. {}초 뒤 다시 시작.",
-        "AUTO_WAIT": "자동생성 딜레이를 기다리는 중... {}초"
+        "LOAD_COMPLETE": "파일 로드 완료",
+        "LOADING": "로드 중...",
+        "AUTO_GENERATING_COUNT": "연속 생성 중 ({}/{})",
+        "AUTO_GENERATING_INF": "연속 생성 중",
+        "AUTO_WAIT": "다음 생성 대기 중... ({}초)",
+        "AUTO_ERROR_WAIT": "에러 발생. {}초 후 재시도...",
     }
 
-    ABOUT = """
-본진 : 
-  아카라이브 AI그림 채널 https://arca.live/b/aiart
-만든이 : 
-  https://arca.live/b/aiart @DCP
-크레딧 :
-  https://huggingface.co/baqu2213
-  https://github.com/neggles/sd-webui-stealth-pnginfo/
-    """
+    ABOUT = """NAI Auto Generator v2.0
 
-    LABEL_PROMPT = "프롬프트(Prompt)"
-    LABEL_PROMPT_HINT = "이곳에 원하는 특징을 입력하세요.\n(예 - 1girl, Tendou Aris (Blue archive), happy)"
-    LABEL_NPROMPT = "네거티브 프롬프트(Undesired Content)"
-    LABEL_NPROMPT_HINT = "이곳에 원하지 않는 특징을 입력하세요.\n(예 - bad quality, low quality, lowres, displeasing)"
-    LABEL_AISETTING = "생성 옵션(AI Settings)"
+Made by DCP-ave
+
+대상 API: Novel AI Image API
+
+Notice : "본 앱은 제3자가 개발한 앱으로 노벨AI 또는 Stability AI에서 개발하거나 관리하지 않으며, 이들 회사와는 무관합니다."
+
+="This app is a third-party app that is not developed or managed by Novel AI or Stability AI and is unaffiliated with those companies."
+
+Github: https://github.com/DCP-arca/NAI-Auto-Generator
+"""
 
 
-RESOLUTION_FAMILIY = {
-    0: ["Portrait (832x1216)", "Landscape (1216x832)", "Square (1024x1024)"],
-    1: ["Portrait (1024x1536)", "Landscape (1536x1024)", "Square (1472x1472)"],
-    2: ["Portrait (1088x1920)", "Landscape (1920x1088)"],
-    3: ["Portrait (512x768)", "Landscape (768x512)", "Square (640x640)"],
-    4: []
+# 기본 파라미터 수정
+DEFAULT_PARAMS = {
+    "prompt": "",
+    "negative_prompt": "",
+    "width": "1024",  # 기본값을 HD로 변경
+    "height": "1024",  # 기본값을 HD로 변경
+    "steps": "28",
+    "sampler": "k_euler_ancestral",
+    "seed": "-1",
+    "scale": "5.0",    
+    "cfg_rescale": "0",
+    "autoSmea": "True",
+    "quality_toggle": "True",
+    "strength": "0.7",
+    "noise": "0.0",
+    "reference_information_extracted": "1.0",
+    "reference_strength": "0.6",
+    "v4_model_preset": "Artistic",
+    "anti_artifacts": "0.0",
+    "dynamic_thresholding": "False",
 }
-RESOLUTION_FAMILIY_MASK = [
-    -1,
-    0,
-    0,
-    0,
-    -1,
-    1,
-    1,
-    1,
-    -1,
-    2,
-    2,
-    -1,
-    3,
-    3,
-    3,
-    -1,
-    4
-]
+
+DEFAULT_PATH = {
+    "path_results": "./results/",
+    "path_settings": "./settings/",
+    "path_wildcards": "./wildcards/",
+    "path_models": "./models/",
+}

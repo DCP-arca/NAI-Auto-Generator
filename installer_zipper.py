@@ -20,9 +20,9 @@ def zip_two_folders(folder1_path, folder2_path, output_zip_path):
 
 
 if __name__ == "__main__":
-    folder_dist = r"D:\Dev\Workspace\Python\NAI-Auto-Generator\dist"
-    folder_dist_onefile = r"D:\Dev\Workspace\Python\NAI-Auto-Generator\dist_onefile"
-    folder_for_release = r"D:\Dev\Workspace\Python\NAI-Auto-Generator\folder_for_release"
+    folder_dist = r"C:\NAI-Auto-Generator\dist"
+    folder_dist_onefile = r"C:\NAI-Auto-Generator\dist_onefile"
+    folder_for_release = r"C:\NAI-Auto-Generator\folder_for_release"
 
-    zip_two_folders(folder_dist, folder_for_release, r'D:\Dev\Workspace\Python\NAI-Auto-Generator\dist_release_zip\NAI-Auto_Generator.zip')
-    zip_two_folders(folder_dist_onefile, folder_for_release, r'D:\Dev\Workspace\Python\NAI-Auto-Generator\dist_release_zip\NAI-Auto_Generator-Onefile.zip')
+    zip_two_folders(folder_dist, folder_for_release, r'C:\NAI-Auto-Generator\dist_release_zip\NAI-Auto_Generator.zip')
+    zip_two_folders(folder_dist_onefile, folder_for_release, r'C:\NAI-Auto-Generator\dist_release_zip\NAI-Auto_Generator-Onefile.zip')

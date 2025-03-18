@@ -8,6 +8,7 @@ import string
 
 class CustomCompleter(QCompleter):
     def __init__(self, words, parent=None):
+        print(f"CustomCompleter 초기화: {len(words)}개 단어")
         super().__init__(words, parent)
         self.words = words
         self.setCaseSensitivity(Qt.CaseInsensitive)
@@ -17,21 +18,39 @@ class CustomCompleter(QCompleter):
 
     def setCompletionPrefix(self, prefix):
         self.prefix = prefix
-
+        
+        # 최소 2글자 이상부터 검색 (성능 향상)
+        if len(prefix) < 2:
+            self.model.setStringList([])
+            super().setCompletionPrefix(prefix)
+            return
+            
         is_add_mode = len(self.prefix) > 3
         prefix_lower = self.prefix.lower()
         filtered_words = []
         contains_matches = []
-        for word in self.words:
+        
+        # 제한된 개수만 검색 (성능 향상)
+        words_count = min(3000, len(self.words))
+        for i in range(words_count):
+            word = self.words[i]
             word_lower = word.lower()
             if word_lower.startswith(prefix_lower):
                 filtered_words.append(word)
+                # 시작 일치 항목이 일정 수 이상이면 중단
+                if len(filtered_words) > 50:
+                    break
             elif is_add_mode and prefix_lower in word_lower:
                 contains_matches.append(word)
+                # 포함 일치 항목이 일정 수 이상이면 중단
+                if len(contains_matches) > 50:
+                    break
 
+        # 최대 표시 항목 제한
         if is_add_mode:
-            filtered_words.extend(sorted(contains_matches))
-
+            filtered_words.extend(sorted(contains_matches)[:50])
+        
+        # 목록 업데이트
         self.model.setStringList(filtered_words)
         super().setCompletionPrefix(prefix)
         self.complete()
@@ -39,9 +58,21 @@ class CustomCompleter(QCompleter):
 
 class CompletionTextEdit(QTextEdit):
     def __init__(self):
+        print("CompletionTextEdit 초기화")
         super().__init__()
         self.completer = None
         self.textChanged.connect(self.highlightBrackets)
+    
+    def insertFromMimeData(self, source):
+        """클립보드에서 붙여넣기할 때 서식 없는 텍스트만 삽입"""
+        if source.hasText():
+            # 서식 없는 일반 텍스트만 가져와서 현재 커서 위치에 삽입
+            cursor = self.textCursor()
+            cursor.insertText(source.text())
+        else:
+            # 기본 처리 방식 사용 (텍스트가 없는 다른 형식의 데이터인 경우)
+            super().insertFromMimeData(source)
+        
     def highlightBrackets(self):
         text = self.toPlainText()
 
@@ -84,24 +115,43 @@ class CompletionTextEdit(QTextEdit):
         self.setExtraSelections(extraSelections)
 
     def start_complete_mode(self, tag_list):
-        completer = CustomCompleter(tag_list)
+        print(f"start_complete_mode 호출: {len(tag_list)}개 태그")
+        if not tag_list:
+            print("태그 목록이 비어 있어 자동 완성을 설정하지 않습니다.")
+            return
+            
+        try:
+            completer = CustomCompleter(tag_list)
+            self.setCompleter(completer)
+            print("자동 완성 설정 완료")
+        except Exception as e:
+            print(f"자동 완성 설정 중 오류 발생: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
-        self.setCompleter(completer)
-
+    
     def setCompleter(self, completer):
         if self.completer:
-            self.disconnect(self.completer, self.insertCompletion)
+            try:
+                self.disconnect(self.completer, self.insertCompletion)
+            except:
+                pass  # 이전 연결이 없을 수 있으므로 예외 무시
         self.completer = completer
         if not self.completer:
             return
         self.completer.setWidget(self)
         self.completer.setCompletionMode(QCompleter.PopupCompletion)
         self.completer.setCaseSensitivity(False)
-        self.completer.activated.connect(self.insertCompletion)
+        try:
+            self.completer.activated.connect(self.insertCompletion)
+        except:
+            print("자동완성 신호 연결 실패")
 
     def insertCompletion(self, completion):
-        actual_text = completion.split('[')[0]  # 'apple[30]' -> 'apple'
+        # CSV 형식 처리 (태그[숫자] => 태그)
+        actual_text = completion.split('[')[0] if '[' in completion else completion
         actual_text = actual_text.replace("_", " ")
+        
         tc = self.textCursor()
         extra = len(actual_text) - len(self.completer.completionPrefix())
         tc.movePosition(QTextCursor.Left)

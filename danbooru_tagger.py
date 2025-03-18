@@ -13,6 +13,20 @@ LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
               "wd-v1-4-convnext-tagger-v2", "wd-v1-4-convnext-tagger",
               "wd-v1-4-convnextv2-tagger-v2", "wd-v1-4-vit-tagger-v2")
 
+def get_available_models(self):
+    """
+    다운로드 가능한 모델 목록을 반환합니다.
+    """
+    # LIST_MODEL 상수에서 다운로드 가능한 모델 목록 가져오기
+    all_models = LIST_MODEL
+    
+    # 이미 설치된 모델 목록 가져오기
+    installed_models = [model.replace(".onnx", "") for model in self.get_installed_models()]
+    
+    # 설치되지 않은 모델만 필터링
+    available_models = [model for model in all_models if model not in installed_models]
+    
+    return available_models
 
 def download_file(url, dst):
     try:
