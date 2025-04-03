@@ -8,10 +8,9 @@ import numpy as np
 import requests
 import shutil
 
-DEFAULT_MODEL = "wd-v1-4-moat-tagger-v2"
-LIST_MODEL = ("wd-v1-4-moat-tagger-v2",
-              "wd-v1-4-convnext-tagger-v2", "wd-v1-4-convnext-tagger",
-              "wd-v1-4-convnextv2-tagger-v2", "wd-v1-4-vit-tagger-v2")
+from config.paths import PATH_IMG_NO_IMAGE
+
+from config.consts import DEFAULT_TAGGER_MODEL, LIST_TAGGER_MODEL
 
 
 def download_file(url, dst):
@@ -47,7 +46,7 @@ class DanbooruTagger():
     def __init__(self, models_dir):
         self.models_dir = models_dir
         self.options = {
-            "model_name": DEFAULT_MODEL,
+            "model_name": DEFAULT_TAGGER_MODEL,
             "threshold": 0.35,
             "character_threshold": 0.85,
             "replace_underscore": True,
@@ -145,15 +144,3 @@ class DanbooruTagger():
             os.path.join(self.models_dir, f"{model}.csv"))
 
         return is_success
-
-
-if __name__ == '__main__':
-    dt = DanbooruTagger(r'D:\Dev\Workspace\Python\NAI-Auto-Generator\models')
-
-    is_success = dt.download_model("wd-v1-4-moat-tagger-v2")
-
-    print(is_success)
-
-    result = dt.tag(Image.open("no_image.png"))
-
-    print(result)

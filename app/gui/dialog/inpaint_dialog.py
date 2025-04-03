@@ -4,9 +4,6 @@ from PyQt5.QtWidgets import QMainWindow, QDialog, QApplication, QLabel, QSlider,
 from PyQt5.QtGui import QPainter, QPen, QImage, qRgb, qRgba, QKeySequence
 from PyQt5.QtCore import Qt, QPoint, QSize, QEvent
 
-DEFAULT_WINDOW_SIZE = 400
-
-
 def convert_coord(point, original_image_size, now_image_rect):
     wseed = original_image_size.width() / now_image_rect.width()
     hseed = original_image_size.height() / now_image_rect.height()
@@ -85,7 +82,7 @@ class InpaintDialog(QDialog):
         # Label for Image
         self.image_label = QLabel(self)
         self.image_label.setMinimumSize(
-            QSize(DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE))
+            QSize(400, 400))
         self.image_label.installEventFilter(self)
         self.image_label.setMouseTracking(True)
 

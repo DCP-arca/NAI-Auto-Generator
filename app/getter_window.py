@@ -1,10 +1,8 @@
 import sys
-import os
 
 from PyQt5.QtWidgets import QApplication, QMainWindow
-from PyQt5.QtCore import QSettings
 
-from gui_dialog import MiniUtilDialog
+from gui.dialog.miniutil_dialog import MiniUtilDialog
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

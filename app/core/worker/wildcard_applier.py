@@ -1,6 +1,5 @@
 import os
 import random
-from enum import Enum
 
 MAX_TRY_AMOUNT = 10
 

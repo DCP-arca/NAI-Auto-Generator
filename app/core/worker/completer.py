@@ -1,11 +1,9 @@
 from PyQt5.QtWidgets import QCompleter, QTextEdit
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QFont, QColor
 from PyQt5.QtCore import Qt, QStringListModel
-import string
+
 
 # complete_target_stringset = string.ascii_letters + string.digits + "~!#$%^&*_+?.-="
-
-
 class CustomCompleter(QCompleter):
     def __init__(self, words, parent=None):
         super().__init__(words, parent)

@@ -1,187 +1,45 @@
 import json
 import sys
 import os
-import io
-import zipfile
 import time
-import datetime
 import random
-import base64
 from io import BytesIO
 from PIL import Image
 from urllib import request
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QAction, QFileDialog, QMessageBox, QDialog
-from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QThread, pyqtSignal, QTimer, QBuffer
-from gui_init import init_main_widget
-from gui_dialog import LoginDialog, OptionDialog, GenerateDialog, MiniUtilDialog, FileIODialog
+from PyQt5.QtWidgets import QApplication, QMainWindow,  QFileDialog, QMessageBox, QDialog
+from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication,  QTimer
 
-from consts import COLOR, S, DEFAULT_PARAMS, DEFAULT_PATH, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, prettify_naidict, DEFAULT_TAGCOMPLETION_PATH
+from core.thread.generate_thread import GenerateThread
+from core.thread.token_thread import TokenValidateThread
+from core.thread.anlas_thread import AnlasThread
+from core.thread.completiontagload_thread import CompletionTagLoadThread
 
-import naiinfo_getter
-from nai_generator import NAIGenerator, NAIAction
-from wildcard_applier import WildcardApplier
-from danbooru_tagger import DanbooruTagger
+from gui.layout.main_layout import init_main_layout
+from gui.widget.status_bar import StatusBar
+from gui.widget.menu_bar import MenuBar
 
-TITLE_NAME = "NAI Auto Generator"
-TOP_NAME = "dcp_arca"
-APP_NAME = "nag_gui"
+from gui.dialog.generate_dialog import GenerateDialog
+from gui.dialog.miniutil_dialog import MiniUtilDialog
+from gui.dialog.fileio_dialog import FileIODialog
+from gui.dialog.login_dialog import LoginDialog
+from gui.dialog.option_dialog import OptionDialog
+from gui.dialog.etc_dialog import show_setting_dialog
 
-MAX_COUNT_FOR_WHILE = 10
+from util.common_util import strtobool
+from util.image_util import pick_imgsrc_from_foldersrc, convert_qimage_to_imagedata
+from util.string_util import apply_wc_and_lessthan, inject_imagetag
+from util.file_util import create_folder_if_not_exists, get_imgcount_from_foldersrc
+from util.tagger_util import predict_tag_from
 
-#############################################
+from core.worker.naiinfo_getter import get_naidict_from_file, get_naidict_from_txt, get_naidict_from_img
+from core.worker.nai_generator import NAIGenerator
+from core.worker.wildcard_applier import WildcardApplier
+from core.worker.danbooru_tagger import DanbooruTagger
 
-
-def create_folder_if_not_exists(foldersrc):
-    if not os.path.exists(foldersrc):
-        os.makedirs(foldersrc)
-
-
-def prettify_dict(d):
-    return json.dumps(d, sort_keys=True, indent=4)
-
-
-def get_imgcount_from_foldersrc(foldersrc):
-    return len([file for file in os.listdir(foldersrc) if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))])
-
-
-def pick_imgsrc_from_foldersrc(foldersrc, index, sort_order):
-    files = [file for file in os.listdir(foldersrc) if file.lower(
-    ).endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp'))]
-
-    is_reset = False
-    if index != 0 and index % len(files) == 0:
-        is_reset = True
-
-    # 파일들을 정렬
-    if sort_order == '오름차순':
-        files.sort()
-    elif sort_order == '내림차순':
-        files.sort(reverse=True)
-    elif sort_order == '랜덤':
-        random.seed(random.randint(0, 1000000))
-        random.shuffle(files)
-        is_reset = False
-
-    # 인덱스가 파일 개수를 초과하는 경우
-    while index >= len(files):
-        index -= len(files)
-
-    # 정렬된 파일 리스트에서 인덱스에 해당하는 파일의 주소 반환
-    return os.path.join(foldersrc, files[index]), is_reset
-
-
-def strtobool(val):
-    """Convert a string representation of truth to true (1) or false (0).
-    True values are 'y', 'yes', 't', 'true', 'on', and '1'; false values
-    are 'n', 'no', 'f', 'false', 'off', and '0'.  Raises ValueError if
-    'val' is anything else.
-    """
-    if isinstance(val, bool):
-        return val
-
-    val = val.lower()
-    if val in ('y', 'yes', 't', 'true', 'on', '1'):
-        return True
-    elif val in ('n', 'no', 'f', 'false', 'off', '0'):
-        return False
-    else:
-        raise ValueError("invalid truth value %r" % (val,))
-
-
-def pickedit_lessthan_str(original_str):
-    try_count = 0
-
-    edited_str = original_str
-    while try_count < MAX_COUNT_FOR_WHILE:
-        try_count += 1
-
-        before_edit_str = edited_str
-        pos_prev = 0
-        while True:
-            pos_r = edited_str.find(">", pos_prev + 1)
-            if pos_r == -1:
-                break
-
-            pos_l = edited_str.rfind("<", pos_prev, pos_r)
-            if pos_l != -1:
-                left = edited_str[0:pos_l]
-                center = edited_str[pos_l + 1:pos_r]
-                right = edited_str[pos_r + 1:len(edited_str)]
-
-                center_splited = center.split("|")
-                center_picked = center_splited[random.randrange(
-                    0, len(center_splited))]
-
-                result_left = left + center_picked
-                pos_prev = len(result_left)
-                edited_str = result_left + right
-            else:
-                pos_prev = pos_r
-
-        if before_edit_str == edited_str:
-            break
-
-    return edited_str
-
-
-def create_windows_filepath(base_path, filename, extension, max_length=150):
-    # 파일 이름으로 사용할 수 없는 문자 제거
-    cleaned_filename = filename.replace("\n", "")
-    cleaned_filename = cleaned_filename.replace("\\", "")
-
-    invalid_chars = r'<>:"/\|?*'
-    cleaned_filename = ''.join(
-        char for char in cleaned_filename if char not in invalid_chars)
-
-    # 파일 이름의 최대 길이 제한 (확장자 길이 고려)
-    max_filename_length = max_length - len(base_path) - len(extension) - 1
-    if max_filename_length < 5:
-        return None
-    cleaned_filename = cleaned_filename[:max_filename_length]
-
-    # 경로, 파일 이름, 확장자 합치기
-    filepath = os.path.join(base_path, cleaned_filename + extension)
-
-    return filepath
-
-
-def inject_imagetag(original_str, tagname, additional_str):
-    result_str = original_str[:]
-
-    tag_str_left = "@@" + tagname
-    left_pos = original_str.find(tag_str_left)
-    if left_pos != -1:
-        right_pos = original_str.find("@@", left_pos + 1)
-        except_tag_list = [x.strip() for x in original_str[left_pos +
-                                                           len(tag_str_left) + 1:right_pos].split(",")]
-        original_tag_list = [x.strip() for x in additional_str.split(',')]
-        target_tag_list = [
-            x for x in original_tag_list if x not in except_tag_list]
-
-        result_str = original_str[0:left_pos] + ", ".join(target_tag_list) + \
-            original_str[right_pos + 2:len(original_str)]
-
-    return result_str
-
-
-def get_filename_only(path):
-    filename, _ = os.path.splitext(os.path.basename(path))
-    return filename
-
-
-def convert_qimage_to_imagedata(qimage):
-    try:
-        buf = QBuffer()
-        buf.open(QBuffer.ReadWrite)
-        qimage.save(buf, "PNG")
-        pil_im = Image.open(io.BytesIO(buf.data()))
-
-        buf = io.BytesIO()
-        pil_im.save(buf, format='png', quality=100)
-        return base64.b64encode(buf.getvalue()).decode("utf-8")
-    except Exception as e:
-        return ""
+from config.strings import STRING
+from config.consts import DEFAULT_PARAMS, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, TITLE_NAME, TOP_NAME, APP_NAME, MAX_COUNT_FOR_WHILELOOP
+from config.paths import DEFAULT_PATH
 
 
 class NAIAutoGeneratorWindow(QMainWindow):
@@ -196,17 +54,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_content()
         self.load_data()
         self.check_folders()
-        self.apply_theme()
         self.show()
 
         self.init_nai()
         self.init_wc()
         self.init_tagger()
         self.init_completion()
-
-    def apply_theme(self):
-        font_size = self.settings.value("nag_font_size", 18)
-        self.app.setStyleSheet("QWidget{font-size:" + str(font_size) + "px}")
 
     def init_variable(self):
         self.is_expand = False
@@ -227,61 +80,24 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
+        self.setAcceptDrops(True)
+        
         self.settings = QSettings(TOP_NAME, APP_NAME)
         self.move(self.settings.value("pos", QPoint(500, 200)))
         self.resize(self.settings.value("size", QSize(1179, 1044)))
         self.settings.setValue("splitterSizes", None)
-        self.setAcceptDrops(True)
+        font_size = self.settings.value("nag_font_size", 18)
+        self.app.setStyleSheet("QWidget{font-size:" + str(font_size) + "px}")
 
     def init_statusbar(self):
-        statusbar = self.statusBar()
-        statusbar.messageChanged.connect(self.on_statusbar_message_changed)
-        self.set_statusbar_text("BEFORE_LOGIN")
+        self.statusbar = StatusBar(self.statusBar())
+        self.statusbar.set_statusbar_text("BEFORE_LOGIN")
 
     def init_menubar(self):
-        openAction = QAction('파일 열기(Open file)', self)
-        openAction.setShortcut('Ctrl+O')
-        openAction.triggered.connect(lambda: self.show_file_dialog("file"))
-
-        loginAction = QAction('로그인(Log in)', self)
-        loginAction.setShortcut('Ctrl+L')
-        loginAction.triggered.connect(self.show_login_dialog)
-
-        optionAction = QAction('옵션(Option)', self)
-        optionAction.setShortcut('Ctrl+U')
-        optionAction.triggered.connect(self.show_option_dialog)
-
-        exitAction = QAction('종료(Exit)', self)
-        exitAction.setShortcut('Ctrl+W')
-        exitAction.triggered.connect(self.quit_app)
-
-        aboutAction = QAction('만든 이(About)', self)
-        aboutAction.triggered.connect(self.show_about_dialog)
-
-        getterAction = QAction('이미지 정보 확인기(Info Getter)', self)
-        getterAction.setShortcut('Ctrl+I')
-        getterAction.triggered.connect(self.on_click_getter)
-
-        taggerAction = QAction('태그 확인기(Danbooru Tagger)', self)
-        taggerAction.setShortcut('Ctrl+T')
-        taggerAction.triggered.connect(self.on_click_tagger)
-
-        menubar = self.menuBar()
-        menubar.setNativeMenuBar(False)
-        filemenu_file = menubar.addMenu('&파일(Files)')
-        filemenu_file.addAction(openAction)
-        filemenu_file.addAction(loginAction)
-        filemenu_file.addAction(optionAction)
-        filemenu_file.addAction(exitAction)
-        filemenu_tool = menubar.addMenu('&도구(Tools)')
-        filemenu_tool.addAction(getterAction)
-        filemenu_tool.addAction(taggerAction)
-        filemenu_etc = menubar.addMenu('&기타(Etc)')
-        filemenu_etc.addAction(aboutAction)
+        self.menubar = MenuBar(self)
 
     def init_content(self):
-        widget = init_main_widget(self)
-        self.setCentralWidget(widget)
+        init_main_layout(self)
 
     def init_nai(self):
         self.nai = NAIGenerator()
@@ -293,15 +109,11 @@ class NAIAutoGeneratorWindow(QMainWindow):
             if not access_token or not username or not password:
                 return
 
-            self.set_statusbar_text("LOGGINGIN")
+            self.statusbar.set_statusbar_text("LOGGINGIN")
             self.nai.access_token = access_token
             self.nai.username = username
             self.nai.password = password
 
-            # self.trying_auto_login = True
-            # validate_thread = LoginThread(self, self.nai, username, password)
-            # validate_thread.login_result.connect(self.on_login_result)
-            # validate_thread.start()
             self.trying_auto_login = True
             validate_thread = TokenValidateThread(self)
             validate_thread.validation_result.connect(self.on_login_result)
@@ -359,10 +171,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         self.set_data(data_dict)
 
-        # seed_fix_checkbox will reset on start
-        # self.dict_ui_settings["seed_fix_checkbox"].setChecked(
-        #     strtobool(self.settings.value("seed_fix_checkbox", False)))
-
     def check_folders(self):
         for key, default_path in DEFAULT_PATH.items():
             path = self.settings.value(key, os.path.abspath(default_path))
@@ -387,6 +195,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "cfg_rescale": self.dict_ui_settings["cfg_rescale"].text(),
             "sm": str(self.dict_ui_settings["sm"].isChecked()),
             "sm_dyn": str(self.dict_ui_settings["sm_dyn"].isChecked()),
+            "variety_plus": str(self.dict_ui_settings["variety_plus"].isChecked()),
             "uncond_scale": str(float(self.dict_ui_settings["uncond_scale"].text()) / 100),
             "strength": self.dict_ui_settings["strength"].text(),
             "noise": self.dict_ui_settings["noise"].text(),
@@ -403,6 +212,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["cfg_rescale"] = float(data["cfg_rescale"])
             data["sm"] = strtobool(data["sm"])
             data["sm_dyn"] = strtobool(data["sm_dyn"])
+            data["variety_plus"] = strtobool(data["variety_plus"])
             data["uncond_scale"] = float(data["uncond_scale"])
             data["strength"] = float(data["strength"])
             data["noise"] = float(data["noise"])
@@ -423,14 +233,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data['sm_dyn'] = False
 
         # data precheck
-        data["prompt"], data["negative_prompt"] = self._preedit_prompt(
-            data["prompt"], data["negative_prompt"])
+        self.check_folders()
+        data["prompt"] =  apply_wc_and_lessthan(self.wcapplier, data["prompt"])
+        data["negative_prompt"] = apply_wc_and_lessthan(self.wcapplier, data["negative_prompt"])
 
         # seed pick
         if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
             data["seed"] = random.randint(0, 9999999999)
 
-        # wh pick
+        # resolution pick
         if strtobool(self.checkbox_random_resolution.isChecked()):
             fl = self.get_now_resolution_familly_list()
             if fl:
@@ -477,7 +288,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 if target_group.src:
                     if batch[mode_str + "_last_src"] != target_group.src:
                         batch[mode_str + "_last_src"] = target_group.src
-                        batch[mode_str + "_last_dst"] = self.predict_tag_from(
+                        batch[mode_str + "_last_dst"] = predict_tag_from(self, 
                             "src", target_group.src, False)
                         if not batch[mode_str + "_last_dst"]:
                             batch[mode_str + "_last_src"] = ""
@@ -492,36 +303,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 batch[mode_str + "_last_dst"] = ""
 
         return data
-
-    def _preedit_prompt(self, prompt, nprompt):
-        try_count = 0
-        edited_prompt = prompt
-        while try_count < MAX_COUNT_FOR_WHILE:
-            try_count += 1
-
-            before_edit_prompt = edited_prompt
-
-            edited_prompt = pickedit_lessthan_str(edited_prompt)
-            edited_prompt = self.apply_wildcards(edited_prompt)
-
-            if before_edit_prompt == edited_prompt:
-                break
-
-        try_count = 0
-        edited_nprompt = nprompt
-        while try_count < MAX_COUNT_FOR_WHILE:
-            try_count += 1
-
-            before_edit_nprompt = edited_nprompt
-            # lessthan pick
-            edited_nprompt = pickedit_lessthan_str(edited_nprompt)
-            # wildcards pick
-            edited_nprompt = self.apply_wildcards(edited_nprompt)
-
-            if before_edit_nprompt == edited_nprompt:
-                break
-
-        return edited_prompt, edited_nprompt
 
     def _on_after_create_data_apply_gui(self):
         data = self.nai.parameters
@@ -538,7 +319,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
         # result text
-        self.set_result_text(data)
+        self.prompt_layout.set_result_text(data)
 
     def on_click_generate_once(self):
         self.list_settings_batch_target = []
@@ -547,18 +328,18 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.nai.set_param_dict(data)
         self._on_after_create_data_apply_gui()
 
-        generate_thread = GenerateThread(self)
+        generate_thread = GenerateThread(self, False)
         generate_thread.generate_result.connect(self._on_result_generate)
         generate_thread.start()
 
-        self.set_statusbar_text("GENEARTING")
-        self.set_disable_button(True)
+        self.statusbar.set_statusbar_text("GENEARTING")
+        self.generate_buttons_layout.set_disable_button(True)
         self.generate_thread = generate_thread
 
     def _on_result_generate(self, error_code, result):
         self.generate_thread = None
-        self.set_disable_button(False)
-        self.set_statusbar_text("IDLE")
+        self.generate_buttons_layout.set_disable_button(False)
+        self.statusbar.set_statusbar_text("IDLE")
         self.refresh_anlas()
 
         if error_code == 0:
@@ -590,6 +371,22 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
             self.on_click_generate_auto(path_list)
 
+    def proceed_image_batch(self, mode):
+        self.dict_img_batch_target[mode + "_index"] += 1
+        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
+
+        src, is_reset = pick_imgsrc_from_foldersrc(
+            foldersrc=self.dict_img_batch_target[mode + "_foldersrc"],
+            index=self.dict_img_batch_target[mode + "_index"],
+            sort_order=target_group.get_folder_sort_mode()
+        )
+
+        if is_reset:
+            seed = random.randint(0, 9999999999)
+            self.dict_ui_settings["seed"].setText(str(seed))
+
+        self._set_image_gui(mode, src)
+
     def proceed_settings_batch(self):
         self.index_settings_batch_target += 1
 
@@ -615,17 +412,17 @@ class NAIAutoGeneratorWindow(QMainWindow):
                             self, '경고', "세팅을 불러오는데 실패했습니다.")
                         return
 
-                agt = AutoGenerateThread(
-                    self, d.count, d.delay, d.ignore_error)
+                agt = GenerateThread(
+                    self, True, d.count, d.delay, d.ignore_error)
                 agt.on_data_created.connect(
                     self._on_after_create_data_apply_gui)
                 agt.on_error.connect(self._on_error_autogenerate)
                 agt.on_end.connect(self._on_end_autogenerate)
-                agt.on_statusbar_change.connect(self.set_statusbar_text)
+                agt.on_statusbar_change.connect(self.statusbar.set_statusbar_text)
                 agt.on_success.connect(self._on_success_autogenerate)
                 agt.start()
 
-                self.set_autogenerate_mode(True)
+                self.generate_buttons_layout.set_autogenerate_mode(True)
                 self.autogenerate_thread = agt
         else:
             self._on_end_autogenerate()
@@ -638,8 +435,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def _on_end_autogenerate(self):
         self.autogenerate_thread.stop()
         self.autogenerate_thread = None
-        self.set_autogenerate_mode(False)
-        self.set_statusbar_text("IDLE")
+        self.generate_buttons_layout.set_autogenerate_mode(False)
+        self.statusbar.set_statusbar_text("IDLE")
         self.refresh_anlas()
 
     def _on_success_autogenerate(self, result_str):
@@ -653,29 +450,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.proceed_image_batch("vibe")
         if self.list_settings_batch_target:
             self.proceed_settings_batch()
-
-    def set_autogenerate_mode(self, is_autogenrate):
-        self.button_generate_once.setDisabled(is_autogenrate)
-        self.button_generate_sett.setDisabled(is_autogenrate)
-
-        stylesheet = """
-            color:black;
-            background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
-        """ if is_autogenrate else ""
-        self.button_generate_auto.setStyleSheet(stylesheet)
-        self.button_generate_auto.setText(
-            "생성 중지" if is_autogenrate else "연속 생성")
-        self.button_generate_auto.setDisabled(False)
-
-    def apply_wildcards(self, prompt):
-        self.check_folders()
-
-        try:
-            return self.wcapplier.apply_wildcards(prompt)
-        except Exception as e:
-            print(e)
-
-        return prompt
 
     def on_click_open_folder(self, target_pathcode):
         path = self.settings.value(
@@ -700,19 +474,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     self, '경고', "세팅 저장에 실패했습니다.\n\n" + str(e))
 
     def on_click_load_settings(self):
-        path = self.settings.value(
-            "path_settings", DEFAULT_PATH["path_settings"])
-
-        select_dialog = QFileDialog()
-        select_dialog.setFileMode(QFileDialog.ExistingFile)
-        path, _ = select_dialog.getOpenFileName(
-            self, "불러올 세팅 파일을 선택해주세요", path, "Txt File (*.txt)")
-        if path:
-            is_success = self._load_settings(path)
-
-            if not is_success:
-                QMessageBox.information(
-                    self, '경고', "세팅을 불러오는데 실패했습니다.\n\n" + str(e))
+        show_setting_dialog(self)
 
     def _load_settings(self, path):
         try:
@@ -727,14 +489,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             print(e)
 
         return False
-
-    def show_prompt_dialog(self, title, prompt, nprompt):
-        QMessageBox.about(self, title,
-                          "프롬프트:\n" +
-                          prompt +
-                          "\n\n" +
-                          "네거티브 프롬프트:\n" +
-                          nprompt)
 
     def on_random_resolution_checked(self, is_checked):
         if is_checked == 2:
@@ -760,7 +514,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         return RESOLUTION_FAMILIY[family_mask]
 
-    def change_path(self, code, src):
+    def on_change_path(self, code, src):
         path = os.path.abspath(src)
 
         self.settings.setValue(code, path)
@@ -809,29 +563,29 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 self.option_dialog.on_model_downloaded(model_name)
 
     def get_image_info_bysrc(self, file_src):
-        nai_dict, error_code = naiinfo_getter.get_naidict_from_file(file_src)
+        nai_dict, error_code = get_naidict_from_file(file_src)
 
         self._get_image_info_byinfo(nai_dict, error_code, file_src)
 
     def get_image_info_bytxt(self, file_src):
-        nai_dict, error_code = naiinfo_getter.get_naidict_from_txt(file_src)
+        nai_dict, error_code = get_naidict_from_txt(file_src)
 
         self._get_image_info_byinfo(nai_dict, error_code, None)
 
     def get_image_info_byimg(self, img):
-        nai_dict, error_code = naiinfo_getter.get_naidict_from_img(img)
+        nai_dict, error_code = get_naidict_from_img(img)
 
         self._get_image_info_byinfo(nai_dict, error_code, img)
 
     def _get_image_info_byinfo(self, nai_dict, error_code, img_obj):
-        if error_code == 0:
+        if error_code == 1:
             QMessageBox.information(self, '경고', "EXIF가 존재하지 않는 파일입니다.")
-            self.set_statusbar_text("IDLE")
-        elif error_code == 1 or error_code == 2:
+            self.statusbar.set_statusbar_text("IDLE")
+        elif error_code == 2 or error_code == 3:
             QMessageBox.information(
                 self, '경고', "EXIF는 존재하나 NAI로부터 만들어진 것이 아닌 듯 합니다.")
-            self.set_statusbar_text("IDLE")
-        elif error_code == 3:
+            self.statusbar.set_statusbar_text("IDLE")
+        elif error_code == 0:
             new_dict = {
                 "prompt": nai_dict["prompt"], "negative_prompt": nai_dict["negative_prompt"]}
             new_dict.update(nai_dict["option"])
@@ -840,40 +594,18 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.set_data(new_dict)
             if img_obj:
                 self.image_result.set_custom_pixmap(img_obj)
-            self.set_statusbar_text("LOAD_COMPLETE")
+            self.statusbar.set_statusbar_text("LOAD_COMPLETE")
 
     def show_login_dialog(self):
-        LoginDialog(self)
+        self.login_dialog = LoginDialog(self)
+        self.login_dialog.exec_()
 
     def show_option_dialog(self):
         self.option_dialog = OptionDialog(self)
-
         self.option_dialog.exec_()
 
     def show_about_dialog(self):
-        QMessageBox.about(self, 'About', S.ABOUT)
-
-    def set_disable_button(self, will_disable):
-        self.button_generate_once.setDisabled(will_disable)
-        self.button_generate_sett.setDisabled(will_disable)
-        self.button_generate_auto.setDisabled(will_disable)
-
-    def set_result_text(self, nai_dict):
-        additional_dict = {}
-
-        if 'image' in nai_dict and nai_dict['image']:
-            additional_dict["image_src"] = self.i2i_settings_group.src or ""
-        if 'reference_image' in nai_dict and nai_dict['reference_image']:
-            additional_dict["reference_image_src"] = self.vibe_settings_group.src or ""
-
-        if self.dict_img_batch_target["i2i_last_dst"]:
-            additional_dict["image_tag"] = self.dict_img_batch_target["i2i_last_dst"]
-        if self.dict_img_batch_target["vibe_last_dst"]:
-            additional_dict["reference_image_tag"] = self.dict_img_batch_target["vibe_last_dst"]
-
-        content = prettify_naidict(nai_dict, additional_dict)
-
-        self.prompt_result.setText(content)
+        QMessageBox.about(self, 'About', STRING.ABOUT)
 
     def refresh_anlas(self):
         anlas_thread = AnlasThread(self)
@@ -887,15 +619,15 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def on_login_result(self, error_code):
         if error_code == 0:
-            self.set_statusbar_text("LOGINED")
+            self.statusbar.set_statusbar_text("LOGINED")
             self.label_loginstate.set_logged_in(True)
-            self.set_disable_button(False)
+            self.generate_buttons_layout.set_disable_button(False)
             self.refresh_anlas()
         else:
             self.nai = NAIGenerator()  # reset
-            self.set_statusbar_text("BEFORE_LOGIN")
+            self.statusbar.set_statusbar_text("BEFORE_LOGIN")
             self.label_loginstate.set_logged_in(False)
-            self.set_disable_button(True)
+            self.generate_buttons_layout.set_disable_button(True)
             self.set_auto_login(False)
 
         self.trying_auto_login = False
@@ -911,56 +643,13 @@ class NAIAutoGeneratorWindow(QMainWindow):
                                self.nai.password if is_auto_login else None)
 
     def on_logout(self):
-        self.set_statusbar_text("BEFORE_LOGIN")
+        self.statusbar.set_statusbar_text("BEFORE_LOGIN")
 
         self.label_loginstate.set_logged_in(False)
 
-        self.set_disable_button(True)
+        self.generate_buttons_layout.set_disable_button(True)
 
         self.set_auto_login(False)
-
-    def show_file_dialog(self, mode):
-        select_dialog = QFileDialog()
-        select_dialog.setFileMode(QFileDialog.ExistingFile)
-        target_type = '이미지, 텍스트 파일(*.txt *.png *.webp)' if mode == 'file' else '이미지 파일(*.jpg *.png *.webp)'
-        fname = select_dialog.getOpenFileName(
-            self, '불러올 파일을 선택해 주세요.', '', target_type)
-
-        if fname[0]:
-            fname = fname[0]
-
-            if mode == "file":
-                if fname.endswith(".png") or fname.endswith(".webp"):
-                    self.get_image_info_bysrc(fname)
-                elif fname.endswith(".txt"):
-                    self.get_image_info_bytxt(fname)
-                else:
-                    QMessageBox.information(
-                        self, '경고', "png, webp, txt 파일만 가능합니다.")
-                    return
-            else:
-                if fname.endswith(".png") or fname.endswith(".webp") or fname.endswith(".jpg"):
-                    self.set_image_as_param(mode, fname)
-                elif os.path.isdir(fname):
-                    self.set_imagefolder_as_param(mode, fname)
-                else:
-                    QMessageBox.information(
-                        self, '경고', "불러오기는 폴더, jpg, png, webp만 가능합니다.")
-                    return
-
-    def show_openfolder_dialog(self, mode):
-        select_dialog = QFileDialog()
-        select_dialog.setFileMode(QFileDialog.Directory)
-        select_dialog.setOption(QFileDialog.Option.ShowDirsOnly)
-        fname = select_dialog.getExistingDirectory(
-            self, mode + '모드로 열 폴더를 선택해주세요.', '')
-
-        if fname:
-            if os.path.isdir(fname):
-                self.set_imagefolder_as_param(mode, fname)
-            else:
-                QMessageBox.information(
-                    self, '경고', "폴더만 선택 가능합니다.")
 
     def _set_image_gui(self, mode, src):
         if mode == "img2img":
@@ -990,67 +679,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dict_img_batch_target[mode + "_index"] = -1
 
         self.proceed_image_batch(mode)
-
-    def proceed_image_batch(self, mode):
-        self.dict_img_batch_target[mode + "_index"] += 1
-        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
-
-        src, is_reset = pick_imgsrc_from_foldersrc(
-            foldersrc=self.dict_img_batch_target[mode + "_foldersrc"],
-            index=self.dict_img_batch_target[mode + "_index"],
-            sort_order=target_group.get_folder_sort_mode()
-        )
-
-        if is_reset:
-            seed = random.randint(0, 9999999999)
-            self.dict_ui_settings["seed"].setText(str(seed))
-
-        self._set_image_gui(mode, src)
-
-    def on_click_tagcheckbox(self, mode):
-        box = self.sender()
-        if box.isChecked():
-            if not self.settings.value("selected_tagger_model", ""):
-                box.setChecked(False)
-                QMessageBox.information(
-                    self, '경고', "먼저 옵션에서 태깅 모델을 다운/선택 해주세요.")
-                return
-
-            QMessageBox.information(
-                self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@" + mode + "@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
-            return
-
-    # warning! Don't use this function in thread if with_dialog==True
-    def predict_tag_from(self, filemode, target, with_dialog):
-        result = ""
-
-        target_model_name = self.settings.value("selected_tagger_model", '')
-        if not target_model_name:
-            QMessageBox.information(
-                self, '경고', "먼저 옵션에서 태깅 모델을 다운/선택 해주세요.")
-            return ""
-        else:
-            self.dtagger.options["model_name"] = target_model_name
-
-        if filemode == "src":
-            target = Image.open(target)
-
-        if with_dialog:
-            loading_dialog = FileIODialog(
-                "태그하는 중...", lambda: self.dtagger.tag(target))
-            if loading_dialog.exec_() == QDialog.Accepted:
-                result = loading_dialog.result
-                if not result:
-                    list_installed_model = self.dtagger.get_installed_models()
-                    if not (target_model_name in list_installed_model):
-                        self.settings.setValue("selected_tagger_model", '')
-        else:
-            try:
-                result = self.dtagger.tag(target)
-            except Exception as e:
-                print(e)
-
-        return result
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -1092,7 +720,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             QMessageBox.information(
                 self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.\ni2i와 vibe를 사용하고 싶다면 해당 칸에 떨어트려주세요.")
         else:
-            self.set_statusbar_text("LOADING")
+            self.statusbar.set_statusbar_text("LOADING")
             try:
                 url = furl.url()
                 res = request.urlopen(url).read()
@@ -1102,26 +730,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
             except Exception as e:
                 print(e)
-                self.set_statusbar_text("IDLE")
+                self.statusbar.set_statusbar_text("IDLE")
                 QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")
                 return
-
-    def set_statusbar_text(self, status_key="", list_format=[]):
-        statusbar = self.statusBar()
-
-        if status_key:
-            self.status_state = status_key
-            self.status_list_format = list_format
-        else:
-            status_key = self.status_state
-            list_format = self.status_list_format
-
-        statusbar.showMessage(
-            S.LIST_STATSUBAR_STATE[status_key].format(*list_format))
-
-    def on_statusbar_message_changed(self, t):
-        if not t:
-            self.set_statusbar_text()
 
     def closeEvent(self, e):
         size = self.size()
@@ -1137,199 +748,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.close()
         self.app.closeAllWindows()
         QCoreApplication.exit(0)
-
-
-class CompletionTagLoadThread(QThread):
-    on_load_completiontag_sucess = pyqtSignal(list)
-
-    def __init__(self, parent):
-        super(CompletionTagLoadThread, self).__init__(parent)
-
-    def run(self):
-        try:
-            with open(DEFAULT_TAGCOMPLETION_PATH, "r", encoding='utf8') as f:
-                tag_list = f.readlines()
-                if tag_list:
-                    self.on_load_completiontag_sucess.emit(tag_list)
-        except Exception:
-            pass
-
-    def stop(self):
-        self.is_dead = True
-        self.quit()
-
-
-class AutoGenerateThread(QThread):
-    on_data_created = pyqtSignal()
-    on_error = pyqtSignal(int, str)
-    on_success = pyqtSignal(str)
-    on_end = pyqtSignal()
-    on_statusbar_change = pyqtSignal(str, list)
-
-    def __init__(self, parent, count, delay, ignore_error):
-        super(AutoGenerateThread, self).__init__(parent)
-        self.count = int(count or -1)
-        self.delay = float(delay or 0.01)
-        self.ignore_error = ignore_error
-        self.is_dead = False
-
-    def run(self):
-        parent = self.parent()
-
-        count = self.count
-        delay = float(self.delay)
-
-        temp_preserve_data_once = False
-        while count != 0:
-            # 1. Generate
-
-            # generate data
-            if not temp_preserve_data_once:
-                data = parent._get_data_for_generate()
-                parent.nai.set_param_dict(data)
-                self.on_data_created.emit()
-            temp_preserve_data_once = False
-
-            # set status bar
-            if count <= -1:
-                self.on_statusbar_change.emit("AUTO_GENERATING_INF", [])
-            else:
-                self.on_statusbar_change.emit("AUTO_GENERATING_COUNT", [
-                    self.count, self.count - count + 1])
-
-            # before generate, if setting batch
-            path = parent.settings.value(
-                "path_results", DEFAULT_PATH["path_results"])
-            create_folder_if_not_exists(path)
-            if parent.list_settings_batch_target:
-                setting_path = parent.list_settings_batch_target[parent.index_settings_batch_target]
-                setting_name = get_filename_only(setting_path)
-                path = path + "/" + setting_name
-                create_folder_if_not_exists(path)
-
-            # generate image
-            error_code, result_str = _threadfunc_generate_image(
-                self, path)
-            if self.is_dead:
-                return
-            if error_code == 0:
-                self.on_success.emit(result_str)
-            else:
-                if self.ignore_error:
-                    for t in range(int(delay), 0, -1):
-                        self.on_statusbar_change.emit("AUTO_ERROR_WAIT", [t])
-                        time.sleep(1)
-                        if self.is_dead:
-                            return
-
-                    temp_preserve_data_once = True
-                    continue
-                else:
-                    self.on_error.emit(error_code, result_str)
-                    return
-
-            # 2. Wait
-            count -= 1
-            if count != 0:
-                temp_delay = delay
-                for x in range(int(delay)):
-                    self.on_statusbar_change.emit("AUTO_WAIT", [temp_delay])
-                    time.sleep(1)
-                    if self.is_dead:
-                        return
-                    temp_delay -= 1
-
-        self.on_end.emit()
-
-    def stop(self):
-        self.is_dead = True
-        self.quit()
-
-
-def _threadfunc_generate_image(thread_self, path):
-    # 1 : get image
-    parent = thread_self.parent()
-    nai = parent.nai
-    action = NAIAction.generate
-    if nai.parameters["image"]:
-        action = NAIAction.img2img
-    if nai.parameters['mask']:
-        action = NAIAction.infill
-    data = nai.generate_image(action)
-    if not data:
-        return 1, "서버에서 정보를 가져오는데 실패했습니다."
-
-    # 2 : open image
-    try:
-        zipped = zipfile.ZipFile(io.BytesIO(data))
-        image_bytes = zipped.read(zipped.infolist()[0])
-        img = Image.open(io.BytesIO(image_bytes))
-    except Exception as e:
-        return 2, str(e) + str(data)
-
-    # 3 : save image
-    create_folder_if_not_exists(path)
-    dst = ""
-    if parent.dict_img_batch_target["img2img_foldersrc"] and strtobool(thread_self.parent().settings.value("will_savename_i2i", False)):
-        filename = get_filename_only(parent.i2i_settings_group.src)
-        extension = ".png"
-        dst = os.path.join(path, filename + extension)
-        while os.path.isfile(dst):
-            filename += "_"
-            dst = os.path.join(path, filename + extension)
-    else:
-        timename = datetime.datetime.now().strftime(
-            "%y%m%d_%H%M%S%f")[:-4]
-        filename = timename
-        if strtobool(thread_self.parent().settings.value("will_savename_prompt", True)):
-            filename += "_" + nai.parameters["prompt"]
-        dst = create_windows_filepath(path, filename, ".png")
-        if not dst:
-            dst = timename
-    try:
-        img.save(dst)
-    except Exception as e:
-        return 3, str(e)
-
-    return 0, dst
-
-
-class GenerateThread(QThread):
-    generate_result = pyqtSignal(int, str)
-
-    def __init__(self, parent):
-        super(GenerateThread, self).__init__(parent)
-
-    def run(self):
-        path = self.parent().settings.value(
-            "path_results", DEFAULT_PATH["path_results"])
-        error_code, result_str = _threadfunc_generate_image(self, path)
-
-        self.generate_result.emit(error_code, result_str)
-
-
-class TokenValidateThread(QThread):
-    validation_result = pyqtSignal(int)
-
-    def __init__(self, parent):
-        super(TokenValidateThread, self).__init__(parent)
-
-    def run(self):
-        is_login_success = self.parent().nai.check_logged_in()
-
-        self.validation_result.emit(0 if is_login_success else 1)
-
-
-class AnlasThread(QThread):
-    anlas_result = pyqtSignal(int)
-
-    def __init__(self, parent):
-        super(AnlasThread, self).__init__(parent)
-
-    def run(self):
-        anlas = self.parent().nai.get_anlas() or -1
-
-        self.anlas_result.emit(anlas)
 
 
 if __name__ == '__main__':

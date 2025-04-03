@@ -41,6 +41,7 @@ class NAIParam(Enum):
     noise = 20,
     strength = 21,
     mask = 22,
+    variety_plus = 23,
 
 
 TYPE_NAIPARAM_DICT = {
@@ -52,6 +53,7 @@ TYPE_NAIPARAM_DICT = {
     NAIParam.cfg_rescale: float,
     NAIParam.sm: bool,
     NAIParam.sm_dyn: bool,
+    NAIParam.variety_plus: bool,
     NAIParam.sampler: str,
     NAIParam.seed: int,
     NAIParam.extra_noise_seed: int,
@@ -107,6 +109,7 @@ class NAIGenerator():
             "uncond_scale": 1.0,
             "sm": True,
             "sm_dyn": True,
+            "variety_plus": False,
             "decrisper": False,
             "controlnet_strength": 1.0,
             "add_original_image": False,
@@ -226,13 +229,9 @@ if __name__ == "__main__":
     username = config['USER']['username']
     password = config['USER']['password']
 
-    print(username, password)
-
     naiG = NAIGenerator()
 
     is_login_success = naiG.try_login(username, password)
-    print(is_login_success)
-    print(naiG.check_logged_in())
 
     if is_login_success:
         # print(naiG.get_anlas())
