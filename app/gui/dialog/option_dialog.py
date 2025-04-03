@@ -127,7 +127,7 @@ class OptionDialog(QDialog):
         font_progress_bar.valueChanged.connect(self.on_fontlabel_updated)
         font_layout.addWidget(font_progress_bar)
 
-        checkbox_completeoff = QCheckBox("태그 자동완성 끄기(저사양용)")
+        checkbox_completeoff = QCheckBox("태그 자동완성 키기")
         checkbox_completeoff.setChecked(strtobool(
             parent.settings.value("will_complete_tag", True)))
         self.checkbox_completeoff = checkbox_completeoff
