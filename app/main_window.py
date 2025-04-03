@@ -129,10 +129,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
     def init_completion(self):
         if strtobool(self.settings.value("will_complete_tag", True)):
-            generate_thread = CompletionTagLoadThread(self)
-            generate_thread.on_load_completiontag_sucess.connect(
-                self._on_load_completiontag_sucess)
-            generate_thread.start()
+            CompletionTagLoadThread(self).start()
 
     def save_data(self):
         data_dict = self.get_data()
@@ -175,12 +172,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         for key, default_path in DEFAULT_PATH.items():
             path = self.settings.value(key, os.path.abspath(default_path))
             create_folder_if_not_exists(path)
-
-    def _on_load_completiontag_sucess(self, tag_list):
-        if tag_list:
-            target_code = ["prompt", "negative_prompt"]
-            for code in target_code:
-                self.dict_ui_settings[code].start_complete_mode(tag_list)
 
     def get_data(self, do_convert_type=False):
         data = {
