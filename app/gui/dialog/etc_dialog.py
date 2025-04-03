@@ -54,7 +54,7 @@ def show_openfolder_dialog(self, mode):
             QMessageBox.information(
                 self, '경고', "폴더만 선택 가능합니다.")
 
-def show_setting_dialog(self):
+def show_setting_load_dialog(self):
     path = self.settings.value(
         "path_settings", DEFAULT_PATH["path_settings"])
 
@@ -68,3 +68,18 @@ def show_setting_dialog(self):
         if not is_success:
             QMessageBox.information(
                 self, '경고', "세팅을 불러오는데 실패했습니다.\n\n")
+
+def show_setting_save_dialog(self):
+    path = self.settings.value(
+        "path_settings", DEFAULT_PATH["path_settings"])
+    path, _ = QFileDialog.getSaveFileName(
+        self, "세팅 파일을 저장할 곳을 선택해주세요", path, "Txt File (*.txt)")
+    if path:
+        try:
+            json_str = json.dumps(self.get_data(True))
+            with open(path, "w", encoding="utf8") as f:
+                f.write(json_str)
+        except Exception as e:
+            print(e)
+            QMessageBox.information(
+                self, '경고', "세팅 저장에 실패했습니다.\n\n" + str(e))

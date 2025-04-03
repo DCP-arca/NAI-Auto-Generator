@@ -24,7 +24,7 @@ from gui.dialog.miniutil_dialog import MiniUtilDialog
 from gui.dialog.fileio_dialog import FileIODialog
 from gui.dialog.login_dialog import LoginDialog
 from gui.dialog.option_dialog import OptionDialog
-from gui.dialog.etc_dialog import show_setting_dialog
+from gui.dialog.etc_dialog import show_setting_load_dialog, show_setting_save_dialog
 
 from util.common_util import strtobool
 from util.image_util import pick_imgsrc_from_foldersrc, convert_qimage_to_imagedata
@@ -459,22 +459,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
         os.startfile(path)
 
     def on_click_save_settings(self):
-        path = self.settings.value(
-            "path_settings", DEFAULT_PATH["path_settings"])
-        path, _ = QFileDialog.getSaveFileName(
-            self, "세팅 파일을 저장할 곳을 선택해주세요", path, "Txt File (*.txt)")
-        if path:
-            try:
-                json_str = json.dumps(self.get_data(True))
-                with open(path, "w", encoding="utf8") as f:
-                    f.write(json_str)
-            except Exception as e:
-                print(e)
-                QMessageBox.information(
-                    self, '경고', "세팅 저장에 실패했습니다.\n\n" + str(e))
+        show_setting_save_dialog(self)
 
     def on_click_load_settings(self):
-        show_setting_dialog(self)
+        show_setting_load_dialog(self)
 
     def _load_settings(self, path):
         try:
