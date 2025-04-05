@@ -17,7 +17,6 @@ DEFAULT_PARAMS = {
     "sm_dyn": True,
     "scale": 5,
     "cfg_rescale": 0,
-    "uncond_scale": 1.0,
     "strength": 0.7,
     "noise": 0.0,
     "reference_information_extracted": 1.0,

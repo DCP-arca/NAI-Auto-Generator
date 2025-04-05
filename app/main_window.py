@@ -7,8 +7,8 @@ from io import BytesIO
 from PIL import Image
 from urllib import request
 
-from PyQt5.QtWidgets import QApplication, QMainWindow,  QFileDialog, QMessageBox, QDialog
-from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication,  QTimer
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog, QMessageBox, QDialog
+from PyQt5.QtCore import QSettings, QPoint, QSize, QCoreApplication, QTimer
 
 from core.thread.generate_thread import GenerateThread
 from core.thread.token_thread import TokenValidateThread
@@ -27,7 +27,7 @@ from gui.dialog.option_dialog import OptionDialog
 from gui.dialog.etc_dialog import show_setting_load_dialog, show_setting_save_dialog
 
 from util.common_util import strtobool
-from util.image_util import pick_imgsrc_from_foldersrc, convert_qimage_to_imagedata
+from util.image_util import pick_imgsrc_from_foldersrc, convert_qimage_to_imagedata, convert_src_to_imagedata
 from util.string_util import apply_wc_and_lessthan, inject_imagetag
 from util.file_util import create_folder_if_not_exists, get_imgcount_from_foldersrc
 from util.tagger_util import predict_tag_from
@@ -81,7 +81,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
         self.setAcceptDrops(True)
-        
+
         self.settings = QSettings(TOP_NAME, APP_NAME)
         self.move(self.settings.value("pos", QPoint(500, 200)))
         self.resize(self.settings.value("size", QSize(1179, 1044)))
@@ -140,16 +140,12 @@ class NAIAutoGeneratorWindow(QMainWindow):
             self.settings.setValue(k, v)
 
     def set_data(self, data_dict):
-        # uncond_scale shown as * 100
-        uncond_scale = data_dict['uncond_scale']
-        data_dict['uncond_scale'] = str(int(float(uncond_scale) * 100))
-
         dict_ui = self.dict_ui_settings
 
         dict_ui["sampler"].setCurrentText(data_dict["sampler"])
 
         list_ui_using_settext = ["prompt", "negative_prompt", "width", "height",
-                                 "steps", "seed", "scale", "uncond_scale", "cfg_rescale",
+                                 "steps", "seed", "scale", "cfg_rescale",
                                  "strength", "noise", "reference_information_extracted", "reference_strength"]
         for key in list_ui_using_settext:
             if key in data_dict:
@@ -187,7 +183,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "sm": str(self.dict_ui_settings["sm"].isChecked()),
             "sm_dyn": str(self.dict_ui_settings["sm_dyn"].isChecked()),
             "variety_plus": str(self.dict_ui_settings["variety_plus"].isChecked()),
-            "uncond_scale": str(float(self.dict_ui_settings["uncond_scale"].text()) / 100),
             "strength": self.dict_ui_settings["strength"].text(),
             "noise": self.dict_ui_settings["noise"].text(),
             "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
@@ -204,7 +199,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["sm"] = strtobool(data["sm"])
             data["sm_dyn"] = strtobool(data["sm_dyn"])
             data["variety_plus"] = strtobool(data["variety_plus"])
-            data["uncond_scale"] = float(data["uncond_scale"])
             data["strength"] = float(data["strength"])
             data["noise"] = float(data["noise"])
             data["reference_information_extracted"] = float(
@@ -225,8 +219,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         # data precheck
         self.check_folders()
-        data["prompt"] =  apply_wc_and_lessthan(self.wcapplier, data["prompt"])
-        data["negative_prompt"] = apply_wc_and_lessthan(self.wcapplier, data["negative_prompt"])
+        data["prompt"] = apply_wc_and_lessthan(self.wcapplier, data["prompt"])
+        data["negative_prompt"] = apply_wc_and_lessthan(
+            self.wcapplier, data["negative_prompt"])
 
         # seed pick
         if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
@@ -247,7 +242,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         data["reference_image"] = None
         data["mask"] = None
         if self.i2i_settings_group.src:
-            imgdata_i2i = self.nai.convert_src_to_imagedata(
+            imgdata_i2i = convert_src_to_imagedata(
                 self.i2i_settings_group.src)
             if imgdata_i2i:
                 data["image"] = imgdata_i2i
@@ -263,7 +258,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             else:
                 self.i2i_settings_group.on_click_removebutton()
         if self.vibe_settings_group.src:
-            imgdata_vibe = self.nai.convert_src_to_imagedata(
+            imgdata_vibe = convert_src_to_imagedata(
                 self.vibe_settings_group.src)
             if imgdata_vibe:
                 data["reference_image"] = imgdata_vibe
@@ -279,8 +274,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 if target_group.src:
                     if batch[mode_str + "_last_src"] != target_group.src:
                         batch[mode_str + "_last_src"] = target_group.src
-                        batch[mode_str + "_last_dst"] = predict_tag_from(self, 
-                            "src", target_group.src, False)
+                        batch[mode_str + "_last_dst"] = predict_tag_from(self,
+                                                                         "src", target_group.src, False)
                         if not batch[mode_str + "_last_dst"]:
                             batch[mode_str + "_last_src"] = ""
                             batch[mode_str + "_last_dst"] = ""
@@ -409,7 +404,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     self._on_after_create_data_apply_gui)
                 agt.on_error.connect(self._on_error_autogenerate)
                 agt.on_end.connect(self._on_end_autogenerate)
-                agt.on_statusbar_change.connect(self.statusbar.set_statusbar_text)
+                agt.on_statusbar_change.connect(
+                    self.statusbar.set_statusbar_text)
                 agt.on_success.connect(self._on_success_autogenerate)
                 agt.start()
 

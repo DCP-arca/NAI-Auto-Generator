@@ -4,6 +4,7 @@ from gui.widget.custom_slider_widget import CustomSliderWidget
 
 from config.consts import SAMPLER_ITEMS
 
+
 def init_parameter_options_layout(self):
     layout = QVBoxLayout()
 
@@ -99,19 +100,6 @@ def init_parameter_options_layout(self):
     )
     advanced_settings_layout.addLayout(prompt_rescale_layout)
 
-    # Undesired Content Strength
-    undesired_content_layout = CustomSliderWidget(
-        title="Undesired Content Strength:",
-        min_value=0,
-        max_value=100,
-        default_value=100,
-        ui_width=40,
-        mag=1,
-        slider_text_lambda=lambda value: "%d" % value,
-        enable_percent_label=True
-    )
-    advanced_settings_layout.addLayout(undesired_content_layout)
-
     advanced_settings_group.setLayout(advanced_settings_layout)
     layout.addWidget(advanced_settings_group)
 
@@ -124,6 +112,5 @@ def init_parameter_options_layout(self):
     self.dict_ui_settings["variety_plus"] = variety_plus_checkbox
     self.dict_ui_settings["sm"] = smea_checkbox
     self.dict_ui_settings["sm_dyn"] = dyn_checkbox
-    self.dict_ui_settings["uncond_scale"] = undesired_content_layout.edit
 
     return layout

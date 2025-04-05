@@ -8,8 +8,9 @@ import numpy as np
 import requests
 import shutil
 
-from config.paths import PATH_IMG_NO_IMAGE
+from util.file_util import create_folder_if_not_exists
 
+from config.paths import PATH_IMG_NO_IMAGE
 from config.consts import DEFAULT_TAGGER_MODEL, LIST_TAGGER_MODEL
 
 
@@ -28,18 +29,6 @@ def download_file(url, dst):
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
-
-
-def create_folder_if_not_exists(foldersrc):
-    if not os.path.exists(foldersrc):
-        os.makedirs(foldersrc)
-
-
-def convert_src_to_imagedata(img_path, quality=100):
-    img = Image.open(img_path)
-    buf = io.BytesIO()
-    img.save(buf, format='png', quality=100)
-    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 class DanbooruTagger():

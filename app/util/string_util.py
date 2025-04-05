@@ -84,7 +84,6 @@ def prettify_naidict(nai_dict):
         "steps",
         "sampler",
         "cfg_scale",
-        "uncond_scale",
         "sm",
         "sm_dyn",
         "seed",
