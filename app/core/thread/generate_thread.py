@@ -8,8 +8,6 @@ from PIL import Image
 
 from PyQt5.QtCore import QThread, pyqtSignal
 
-from core.worker.nai_generator import NAIAction
-
 from util.common_util import strtobool
 from util.file_util import create_folder_if_not_exists, get_filename_only, create_windows_filepath
 
@@ -19,12 +17,7 @@ from config.paths import DEFAULT_PATH
 def _threadfunc_generate_image(thread_self, path):
     parent = thread_self.parent()
     nai = parent.nai
-    action = NAIAction.generate
-    if nai.parameters["image"]:
-        action = NAIAction.img2img
-    if nai.parameters['mask']:
-        action = NAIAction.infill
-    data = nai.generate_image(action)
+    data = nai.generate_image()
     if not data:
         return 1, "서버에서 정보를 가져오는데 실패했습니다."  # 실패 메시지냐아~
 
