@@ -1,0 +1,1 @@
+{"prompt": "1girl, Tendou Aris (Blue archive), happy", "negative_prompt": "bad quality, low quality, lowres, displeasing", "width": 640, "height": 640, "sampler": "k_euler_ancestral", "steps": 28, "seed": 4863372238, "scale": 5.0, "cfg_rescale": 0.0, "sm": true, "sm_dyn": true, "uncond_scale": 1.0}

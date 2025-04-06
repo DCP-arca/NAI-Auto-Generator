@@ -1,4 +1,5 @@
 import os
+import json
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 
 from config.paths import DEFAULT_PATH
@@ -11,34 +12,24 @@ def show_prompt_dialog(self, title, prompt, nprompt):
                       "네거티브 프롬프트:\n" +
                       nprompt)
 
-def show_file_dialog(self, mode):
+def show_file_dialog(self):
     select_dialog = QFileDialog()
     select_dialog.setFileMode(QFileDialog.ExistingFile)
-    target_type = '이미지, 텍스트 파일(*.txt *.png *.webp)' if mode == 'file' else '이미지 파일(*.jpg *.png *.webp)'
+    target_type = '이미지, 텍스트 파일(*.txt *.png *.webp)' 
     fname = select_dialog.getOpenFileName(
         self, '불러올 파일을 선택해 주세요.', '', target_type)
 
     if fname[0]:
         fname = fname[0]
 
-        if mode == "file":
-            if fname.endswith(".png") or fname.endswith(".webp"):
-                self.get_image_info_bysrc(fname)
-            elif fname.endswith(".txt"):
-                self.get_image_info_bytxt(fname)
-            else:
-                QMessageBox.information(
-                    self, '경고', "png, webp, txt 파일만 가능합니다.")
-                return
+        if fname.endswith(".png") or fname.endswith(".webp"):
+            self.get_image_info_bysrc(fname)
+        elif fname.endswith(".txt"):
+            self.get_image_info_bytxt(fname)
         else:
-            if fname.endswith(".png") or fname.endswith(".webp") or fname.endswith(".jpg"):
-                self.set_image_as_param(mode, fname)
-            elif os.path.isdir(fname):
-                self.set_imagefolder_as_param(mode, fname)
-            else:
-                QMessageBox.information(
-                    self, '경고', "불러오기는 폴더, jpg, png, webp만 가능합니다.")
-                return
+            QMessageBox.information(
+                self, '경고', "png, webp, txt 파일만 가능합니다.")
+            return
 
 def show_openfolder_dialog(self, mode):
     select_dialog = QFileDialog()
@@ -76,7 +67,7 @@ def show_setting_save_dialog(self):
         self, "세팅 파일을 저장할 곳을 선택해주세요", path, "Txt File (*.txt)")
     if path:
         try:
-            json_str = json.dumps(self.get_data(True))
+            json_str = json.dumps(self.get_data_from_savetarget_ui(True))
             with open(path, "w", encoding="utf8") as f:
                 f.write(json_str)
         except Exception as e:

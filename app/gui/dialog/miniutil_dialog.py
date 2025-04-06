@@ -13,7 +13,6 @@ from core.worker.danbooru_tagger import DanbooruTagger
 from core.worker.naiinfo_getter import get_naidict_from_file, get_naidict_from_txt, get_naidict_from_img
 
 from util.image_util import pil2pixmap
-from util.file_util import resource_path
 from util.tagger_util import predict_tag_from
 from util.string_util import prettify_naidict
 
@@ -75,8 +74,8 @@ class MiniUtilDialog(QDialog):
         # 레이아웃 설정
         layout = QVBoxLayout()
         frame = BackgroundFrame(self, opacity=0.3)
-        frame.set_background_image_by_src(resource_path(
-            PATH_IMG_TAGGER if self.mode == "tagger" else PATH_IMG_GETTER))
+        frame.set_background_image_by_src(
+            PATH_IMG_TAGGER if self.mode == "tagger" else PATH_IMG_GETTER)
         self.frame = frame
         self.parent().installEventFilter(frame)
         frame.setFixedSize(QSize(512, 512))

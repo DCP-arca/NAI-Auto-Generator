@@ -4,29 +4,6 @@ APP_NAME = "nag_gui"
 
 MAX_COUNT_FOR_WHILELOOP = 10
 
-DEFAULT_PARAMS = {
-    "prompt": "",
-    "negative_prompt": "",
-    "width": 640,
-    "height": 640,
-    "seed": -1,
-    "extra_noise_seed": -1,
-    "sampler": "k_euler_ancestral",
-    "steps": 28,
-    "sm": True,
-    "sm_dyn": True,
-    "scale": 5,
-    "cfg_rescale": 0,
-    "strength": 0.7,
-    "noise": 0.0,
-    "reference_information_extracted": 1.0,
-    "reference_strength": 0.6,
-}
-
-DEFAULT_SETTING = {'prompt': '1girl, {aris_{{blue_archive}}}, {Character:Tendou Aris{{Blue Archive}}}, {{{chibi}}}, ?, question mark, {grab a pencil}, white eyes, white background, simple background, {looking at viewer}, oversimplified, {{icon}}, best quality, amazing quality, very aesthetic, absurdres', 'negative_prompt':
-                   'nsfw, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract], smile, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract], {{{{{{closed eyes, worst quality, bad quality, buzzcut, pov, text, censored}}}}}}, {{{{bad hands}}}}, {{{bad eyes}}}, {{{undetailed eyes}}}}, text, error, extra digit, fewer digits, jpeg artifacts, signature, watermark, username, reference, {{unfinished}}, {{unclear fingertips}}, {{twist}}, {{Squiggly}}, {{Grumpy}} , {{incomplete}}, {{Imperfect Fingers}}, condom, Disorganized colors ,Cheesy, {{very displeasing}}, {{mess}}, {{Approximate}}, {{Sloppiness}}, Glazed eyes, Glasses, watermark, username, text, signature', 'width': 640, 'height': 640, 'sampler': 'k_euler_ancestral', 'steps': 28, 'seed': 177879407, 'scale': 5.0, 'cfg_rescale': 0.0, 'sm': True, 'sm_dyn': True, 'uncond_scale': 1.0}
-
-
 DEFAULT_RESOLUTION = "Square (640x640)"
 
 RESOLUTION_ITEMS = [
@@ -76,10 +53,6 @@ RESOLUTION_FAMILIY_MASK = [
     -1,
     4
 ]
-
-SAMPLER_ITEMS = ['k_euler', 'k_euler_ancestral',
-                 'k_dpmpp_2s_ancestral', "k_dpmpp_2m", 
-                 'k_dpmpp_sde', "k_dpmpp_2m_sde", "ddim_v3"]
 
 DEFAULT_TAGGER_MODEL = "wd-v1-4-moat-tagger-v2"
 LIST_TAGGER_MODEL = ("wd-v1-4-moat-tagger-v2",

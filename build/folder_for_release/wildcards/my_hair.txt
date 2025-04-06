@@ -1,0 +1,4 @@
+__my_color__ __my_hair_style__
+__my_color__ __my_hair_style__ with __my_hair_add__
+__my_color__ __my_hair_texture__ __my_hair_style__
+__my_color__ __my_hair_texture__ __my_hair_style__ with __my_hair_add__

@@ -1,30 +1,62 @@
-from PyQt5.QtWidgets import QRadioButton, QGroupBox, QFrame, QLabel, QCheckBox, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QMessageBox
-from PyQt5.QtGui import QImage, QPainter
-from PyQt5.QtCore import Qt, QEvent, QRectF, QSize
+from PyQt5.QtWidgets import QWidget, QGroupBox, QFrame, QFileDialog,QLabel,QScrollArea, QVBoxLayout, QHBoxLayout, QPushButton, QDialog
+from PyQt5.QtGui import QPixmap, QImage, QPainter
+from PyQt5.QtCore import Qt, QSize, QRectF, QEvent
 
-from gui.widget.result_image_view import ResultImageView
 from gui.widget.custom_slider_widget import CustomSliderWidget
+from gui.widget.result_image_view import ResultImageView
 
 from gui.dialog.inpaint_dialog import InpaintDialog
-from gui.dialog.etc_dialog import show_file_dialog, show_openfolder_dialog
 
-from util.file_util import resource_path
-from util.ui_util import create_empty
+from util.image_util import convert_src_to_imagedata
 
-from config.paths import PATH_IMG_OPEN_IMAGE, PATH_IMG_OPEN_FOLDER
-from config.themes import COLOR
+from config.paths import PATH_IMG_OPEN_IMAGE, PATH_IMG_IMAGE_CLEAR
+from config.themes import COLOR 
 
-class BackgroundFrame(QFrame):
+PADDING_IMAGE_ITEM = 15
+HEIGHT_IMAGE_ITEM = 150
+MAXHEIGHT_IMAGE_ITEM = 250
+
+VIBE_SLIDER_OPTION1 = {
+    "title": "Information Extracted:",
+    "min_value": 1,
+    "max_value": 100,
+    "edit_width": 50,
+    "mag": 100
+}
+VIBE_SLIDER_OPTION2 = {
+    "title": "Reference Strength:  ",
+    "min_value": 1,
+    "max_value": 100,
+    "edit_width": 50,
+    "mag": 100
+}
+I2I_SLIDER_OPTION1 = {
+    "title":"Strength:",
+    "min_value":1,
+    "max_value":99,
+    "edit_width":50,
+    "mag":100
+}
+I2I_SLIDER_OPTION2 = {
+    "title": "Noise:   ",
+    "min_value": 0,
+    "max_value": 99,
+    "edit_width": 50,
+    "mag": 100
+}
+
+
+class ImageFrame(QFrame):
     def __init__(self, parent=None):
-        super(BackgroundFrame, self).__init__(parent)
+        super(ImageFrame, self).__init__(parent)
 
         self.image = QImage()
 
-    def set_background_image(self, image_path):
+    def set_image_by_src(self, image_path):
         self.image.load(image_path)
         self.update()
 
-    def set_background_image_by_img(self, image):
+    def set_image_by_img(self, image):
         self.image = image
         self.update()
 
@@ -37,305 +69,311 @@ class BackgroundFrame(QFrame):
             (self.height() - scaled_image.height()) / 2,
             scaled_image.width(),
             scaled_image.height())
-        painter.setOpacity(0.5)
         painter.drawImage(target_rect, scaled_image)
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Resize:
             self.update()
             return True
-        return super(BackgroundFrame, self).eventFilter(obj, event)
+        return super(ImageFrame, self).eventFilter(obj, event)
 
+# CustomSliderWidget을 QWidget처럼 사용하기 위한 컨테이너 클래스
+class CustomSliderWidgetContainer(QWidget):
+    def __init__(self, **option_dict):
+        super().__init__()
+        layout = CustomSliderWidget(**option_dict)
+        self.setLayout(layout)
+        # CustomSliderWidget 내부에서 slider를 속성으로 저장했으므로 그대로 노출
+        self.slider = layout.slider
+        self.edit = layout.edit
 
-class ImageSettingGroup(QGroupBox):
-    def __init__(self, title, slider_1, slider_2, func_open_img, func_open_folder, func_tag_check, add_inpaint_button):
-        super(ImageSettingGroup, self).__init__(title)
-        self.setAcceptDrops(True)
+class ImageItem(QWidget):
+    def __init__(self, parent, is_i2i, image_path, parent_layout, settings, remove_callback, index, on_click_inpaint_button=None):
+        super().__init__(parent)
+        self.is_i2i = is_i2i
+        self.image_path = image_path
+        self.parent_layout = parent_layout
+        self.settings = settings
+        self.remove_callback = remove_callback
+        self.index = index  # 생성 시 할당된 인덱스
 
-        settings_layout = QVBoxLayout()
-        self.setLayout(settings_layout)
+        # 초기 작업
+        self.setFixedHeight(HEIGHT_IMAGE_ITEM)  # 각 아이템 높이 HEIGHT_IMAGE_ITEM
+        self.imagedata = convert_src_to_imagedata(image_path)
 
-        ###################################
-        # Before
-        before_frame = QFrame()
-        settings_layout.addWidget(before_frame)
+        # 전체 레이아웃 (HBox: 좌측 이미지, 우측 슬라이더 영역)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(10)
 
-        before_layout = QVBoxLayout()
-        before_layout.setAlignment(Qt.AlignCenter)
-        before_frame.setLayout(before_layout)
+        # 좌측: 이미지 프레임 (HEIGHT_IMAGE_ITEM)
+        image_frame = ImageFrame()
+        # image_frame.setStyleSheet("border: 1px solid gray;")
+        image_frame.setFixedSize(HEIGHT_IMAGE_ITEM, HEIGHT_IMAGE_ITEM)
+        image_frame.set_image_by_src(self.image_path)
+        delete_button = QPushButton("X", image_frame)
+        delete_button.setFixedSize(24, 24)
+        delete_button.setStyleSheet("background-color: red; color: white; border-radius: 12px;")
+        delete_button.move(15, 15)
+        delete_button.clicked.connect(self.delete_self)
+        main_layout.addWidget(image_frame)
+        self.image_frame = image_frame
 
-        before_layout.addStretch(1)
-        before_inner_layout = QHBoxLayout()
-        before_layout.addLayout(before_inner_layout, stretch=1)
-        before_layout.addStretch(1)
+        # 우측: 슬라이더 영역 (VBox)
+        slider_vbox = QVBoxLayout()
+        slider_vbox.setSpacing(10)
+        slider_vbox.setContentsMargins(0, 0, 0, 0)
 
-        def create_open_button(img_src, func):
+        # 저장된 값 복원 (저장된 값이 없으면 기본값 50)
+        mode_str = "i2i" if self.is_i2i else "vibe"
+        val1 = int(self.settings.value(f"{mode_str}_slider_value_{self.index}_1", 50))
+        val2 = int(self.settings.value(f"{mode_str}_slider_value_{self.index}_2", 50))
+
+        # CustomSliderWidgetContainer로 슬라이더1 생성
+        slider1_options=I2I_SLIDER_OPTION1 if self.is_i2i else VIBE_SLIDER_OPTION1
+        slider1_options["default_value"] = val1
+        slider1_options["slider_text_lambda"] = lambda value: "%.2f" % (value / 100)
+        custom_slider1 = CustomSliderWidgetContainer(**slider1_options)
+        # 슬라이더 값 변경 시 QSettings에 저장
+        custom_slider1.slider.valueChanged.connect(lambda value: self.slider_value_changed(value, 1))
+        slider_vbox.addWidget(custom_slider1, stretch=9)
+        self.custom_slider1 = custom_slider1
+
+        # CustomSliderWidgetContainer로 슬라이더2 생성
+        slider2_options=I2I_SLIDER_OPTION2 if self.is_i2i else VIBE_SLIDER_OPTION2
+        slider2_options["default_value"] = val2
+        slider2_options["slider_text_lambda"] = lambda value: "%.2f" % (value / 100)
+        custom_slider2 = CustomSliderWidgetContainer(**slider2_options)
+        # 슬라이더 값 변경 시 QSettings에 저장
+        custom_slider2.slider.valueChanged.connect(lambda value: self.slider_value_changed(value, 2))
+        slider_vbox.addWidget(custom_slider2, stretch=9)
+        self.custom_slider2 = custom_slider2
+
+        main_layout.addLayout(slider_vbox)
+
+        # i2i는 인페인트 버튼 추가
+        if is_i2i:
+            inpaint_button = QPushButton("인페인트")
+            main_layout.addWidget(inpaint_button)
+            self.inpaint_button = inpaint_button
+            if on_click_inpaint_button:
+                inpaint_button.clicked.connect(lambda: on_click_inpaint_button(self.image_path))
+
+    def slider_value_changed(self, value, slider_num):
+        # 슬라이더 값 변경 시 QSettings에 저장
+        mode_str = "i2i" if self.is_i2i else "vibe"
+        key = f"{mode_str}_slider_value_{self.index}_{slider_num}"
+        self.settings.setValue(key, value)
+
+    def change_image(self, qimage, is_mask_applied):
+        if is_mask_applied:
+            self.inpaint_button.setStyleSheet("""
+                    background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
+                    background-position: center;
+                    color: white;
+                """)
+        else:
+            self.inpaint_button.setStyleSheet("")
+        self.image_frame.set_image_by_img(qimage)
+
+    def delete_self(self):
+        self.parent_layout.removeWidget(self)
+        self.deleteLater()
+        if self.remove_callback:
+            self.remove_callback()
+
+    def value(self):
+        return [self.imagedata, self.custom_slider1.edit.text(), self.custom_slider2.edit.text()]
+
+class ButtonsWidget(QWidget):
+    def __init__(self, mode, add_callback, clear_callback=None, parent=None):
+        """
+        mode: "initial"이면 add.png와 folder.png 버튼,
+              "normal"이면 add.png와 clear 버튼.
+        """
+        super().__init__(parent)
+        self.mode = mode
+        self.add_callback = add_callback
+        self.clear_callback = clear_callback
+        self.setFixedHeight(HEIGHT_IMAGE_ITEM)
+        layout = QHBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
+        
+        def create_open_button(img_src, func=None):
             open_button = ResultImageView(
-                resource_path(img_src))
+                img_src)
             open_button.setStyleSheet("""
                 background-color: """ + COLOR.BRIGHT + """;
                 background-position: center
             """)
             open_button.setFixedSize(QSize(80, 80))
-            open_button.clicked.connect(func)
+            if func:
+                open_button.clicked.connect(func)
             return open_button
-        before_inner_layout.addStretch(1)
-        before_inner_layout.addWidget(
-            create_open_button(PATH_IMG_OPEN_IMAGE, func_open_img), stretch=1)
-        before_inner_layout.addStretch(1)
-        before_inner_layout.addWidget(
-            create_open_button(PATH_IMG_OPEN_FOLDER, func_open_folder), stretch=1)
-        before_inner_layout.addStretch(1)
 
-        ###################################
-        # After
-        # background frame
-        after_frame = BackgroundFrame()
-        self.installEventFilter(after_frame)
-        after_frame.setMinimumHeight(200)
-        settings_layout.addWidget(after_frame)
+        # add 버튼 (add.png 아이콘)
+        layout.addStretch(1)
+        self.add_button = create_open_button(PATH_IMG_OPEN_IMAGE, self.add_callback)
+        layout.addWidget(self.add_button)
+        if mode == "initial":
+            pass
+        elif mode == "normal":
+            layout.addStretch(1)
+            # clear 버튼 (Clear 텍스트)
+            self.clear_button = create_open_button(PATH_IMG_IMAGE_CLEAR, self.clear_callback)
+            layout.addWidget(self.clear_button)
+        layout.addStretch(1)
 
-        after_layout = QVBoxLayout()
-        after_frame.setLayout(after_layout)
+class ImageLayout(QWidget):
+    def __init__(self, parent, title, is_i2i):
+        super().__init__(parent)
 
-        # slider
-        after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
-        after_layout.addLayout(slider_1, stretch=1)
-        after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
-        after_layout.addLayout(slider_2, stretch=1)
-
-        # stretch
-        after_layout.addStretch(99)
-
-        folder_layout = QHBoxLayout()
-        after_layout.addLayout(folder_layout, stretch=1)
-        after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
-
-        # radio_sort
-        groupBox_loadmode = QGroupBox("정렬 모드 선택")
-        groupBox_loadmode.setStyleSheet("""
-            QGroupBox{background-color:#00000000}
-            QRadioButton{background-color:#00000000}
-            """)
-        self.groupBox_loadmode = groupBox_loadmode
-        folder_layout.addWidget(groupBox_loadmode)
-
-        groupBoxLayout_loadmode = QHBoxLayout()
-        groupBox_loadmode.setLayout(groupBoxLayout_loadmode)
-
-        self.folder_radio1 = QRadioButton("오름차순")
-        self.folder_radio1.setChecked(True)
-        self.folder_radio2 = QRadioButton("내림차순")
-        self.folder_radio3 = QRadioButton("랜덤")
-        groupBoxLayout_loadmode.addWidget(self.folder_radio1)
-        groupBoxLayout_loadmode.addWidget(self.folder_radio2)
-        groupBoxLayout_loadmode.addWidget(self.folder_radio3)
-
-        # folder_label
-        folder_label = QLabel()
-        folder_label.setStyleSheet("background-color:#00000000")
-        folder_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        folder_layout.addWidget(folder_label)
-
-        # target_layout
-        target_layout = QHBoxLayout()
-        target_title = QLabel("현재 대상: ")
-        target_title.setStyleSheet("background-color:#00000000")
-        target_layout.addWidget(target_title)
-
-        target_content_label = QLabel()
-        target_content_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        target_content_label.setMinimumWidth(360)
-        target_content_label.setWordWrap(False)  # 텍스트 줄 바꿈 설정
-        target_content_label.setStyleSheet("background-color:#00000000")
-        target_layout.addWidget(target_content_label)
-
-        target_remove_button = QPushButton("제거")
-        target_layout.addWidget(target_remove_button)
-
-        target_layout.label = target_content_label
-        target_layout.button = target_remove_button
-        after_layout.addLayout(target_layout, stretch=1)
-        after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
-
-        # tagcheck_layout
-        tagcheck_layout = QHBoxLayout()
-
-        # inpaint
-        if add_inpaint_button:
-            inpaint_button = QPushButton("인페인트")
-            inpaint_button.clicked.connect(self.on_click_inpaint_button)
-            tagcheck_layout.addWidget(inpaint_button)
-
-        tagcheck_layout.addStretch(999)
-
-        tagcheck_checkbox = QCheckBox("이미지 태그 자동 추가: ")
-        tagcheck_checkbox.setLayoutDirection(Qt.RightToLeft)
-        tagcheck_checkbox.setStyleSheet("background-color:#00000000")
-        tagcheck_checkbox.clicked.connect(func_tag_check)
-        tagcheck_layout.addWidget(tagcheck_checkbox, stretch=1)
-
-        after_layout.addLayout(tagcheck_layout, stretch=1)
-        after_layout.addWidget(create_empty(maximum_height=20), stretch=99)
-
-        self.tagcheck_checkbox = tagcheck_checkbox
-        self.target_remove_button = target_remove_button
-        self.folder_label = folder_label
-        self.before_frame = before_frame
-        self.after_frame = after_frame
-        self.target_content_label = target_content_label
-        self.slider_1 = slider_1
-        self.slider_2 = slider_2
-
-        self.set_image()
-
-    def set_image(self, src=""):
-        self.src = src
         self.mask = None
-        if src:
-            self.before_frame.hide()
-            self.after_frame.show()
 
-            self.after_frame.set_background_image(src)
-            self.target_content_label.setText(src)
+        self.settings = parent.settings
+        self.is_i2i = is_i2i
+
+        main_layout = QVBoxLayout(self)
+        groupbox = QGroupBox(title)
+        main_layout.addWidget(groupbox)
+        grouplayout = QVBoxLayout(groupbox)
+
+        main_layout.setContentsMargins(0,0,0,0)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setFrameShape(QFrame.NoFrame)
+        self.scroll_area.setWidgetResizable(True)
+        grouplayout.addWidget(self.scroll_area)
+        
+        self.container = QWidget()
+        self.scroll_layout = QVBoxLayout(self.container)
+        self.scroll_layout.setSpacing(PADDING_IMAGE_ITEM)
+        self.container.setLayout(self.scroll_layout)
+        self.scroll_area.setWidget(self.container)
+
+        # 처음엔 아무 아이템도 없으므로 초기 모드 버튼 위젯 추가 (높이 HEIGHT_IMAGE_ITEM)
+        self.buttons_widget = self.create_buttons_widget("initial")
+        self.scroll_layout.addWidget(self.buttons_widget)
+        self.update_container_height()
+
+    def create_buttons_widget(self, mode):
+        """mode에 따라 ButtonsWidget 생성"""
+        if mode == "initial":
+            return ButtonsWidget(mode, add_callback=self.on_click_add_item)
         else:
-            self.before_frame.show()
-            self.after_frame.hide()
-            self.target_content_label.setText("")
+            return ButtonsWidget(mode, add_callback=self.on_click_add_item, clear_callback=self.clear_all_items)
 
-    def set_folder_mode(self, is_folder_mode):
-        self.folder_radio1.setChecked(True)
-        self.folder_radio2.setChecked(False)
-        self.folder_radio3.setChecked(False)
-        self.groupBox_loadmode.setVisible(is_folder_mode)
-        self.folder_label.setText("(폴더 모드)" if is_folder_mode else " ")
+    def on_click_add_item(self):
+        """파일 다이얼로그를 통해 이미지 선택 후, ImageItem 추가 (버튼 위젯 교체)"""
+        file_dialog = QFileDialog()
+        file_dialog.setFileMode(QFileDialog.ExistingFile)
+        file_dialog.setNameFilter("Images (*.png *.jpg *.jpeg *.webp)")
+        if file_dialog.exec_():
+            image_path = file_dialog.selectedFiles()[0]
 
-    def get_folder_sort_mode(self):
-        if self.folder_radio1.isChecked():
-            return "오름차순"
-        elif self.folder_radio2.isChecked():
-            return "내림차순"
-        elif self.folder_radio3.isChecked():
-            return "랜덤"
+            self._add_item(image_path)
 
-    def connect_on_click_removebutton(self, func):
-        self.target_remove_button.pressed.connect(func)
+    def _add_item(self, image_path):
+        # 마지막 위젯(버튼 위젯)이 있으면 제거
+        last_index = self.scroll_layout.count() - 1
+        last_widget = self.scroll_layout.itemAt(last_index).widget()
+        if isinstance(last_widget, ButtonsWidget):
+            self.scroll_layout.removeWidget(last_widget)
+            last_widget.deleteLater()
+        # 새 ImageItem 생성 시 현재 count()를 인덱스로 사용
+        new_item = ImageItem(self, self.is_i2i, image_path, self.scroll_layout, 
+                             settings=self.settings,
+                             remove_callback=self.on_click_remove_button,
+                             index=self.scroll_layout.count(),
+                             on_click_inpaint_button=self.on_click_inpaint_button)
+        self.scroll_layout.addWidget(new_item)
+        # 새 버튼 위젯 (normal 모드: add와 clear 버튼) 추가
+        if not self.is_i2i:
+            new_buttons = self.create_buttons_widget("normal")
+            self.scroll_layout.addWidget(new_buttons)
+        self.update_container_height()
 
-    def on_click_inpaint_button(self):
-        img = QImage(self.src)
-        mask = self.mask if self.mask else None
-        d = InpaintDialog(img, mask)
-        if d.exec_() == QDialog.Accepted:
-            self.after_frame.set_background_image_by_img(d.mask_add)
-            self.mask = d.mask_only
+    def update_container_height(self):
+        # """컨테이너 높이 계산 (최대 700)
+        #    계산: height = PADDING_IMAGE_ITEM (top padding) + (count * HEIGHT_IMAGE_ITEM) + ((count+1)*PADDING_IMAGE_ITEM)
+        #    예) 0개: PADDING_IMAGE_ITEM, 1개: PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM, 2개: PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM, ... 최대 700
+        # """
+        # calc_height = PADDING_IMAGE_ITEM + count * HEIGHT_IMAGE_ITEM + (count + 1) * PADDING_IMAGE_ITEM
+        count = self.scroll_layout.count()
+        self.scroll_area.setFixedHeight(180 if count <= 1 else MAXHEIGHT_IMAGE_ITEM)
 
+    def on_click_remove_button(self):
+        if self.is_i2i:
+            self.mask = None
+            self.buttons_widget = self.create_buttons_widget("initial")
+            self.scroll_layout.addWidget(self.buttons_widget)
+        self.update_container_height()
 
-def on_click_tagcheckbox(self, mode):
-    box = self.sender()
-    if box.isChecked():
-        if not self.settings.value("selected_tagger_model", ""):
-            box.setChecked(False)
-            QMessageBox.information(
-                self, '경고', "먼저 옵션에서 태깅 모델을 다운/선택 해주세요.")
-            return
+    def clear_all_items(self):
+        """Clear 버튼 클릭 시 모든 아이템과 버튼 위젯 제거, QSettings 초기화"""
+        while self.scroll_layout.count() > 0:
+            item = self.scroll_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        # 초기 상태: 초기 모드 버튼 위젯 추가
+        init_buttons = self.create_buttons_widget("initial")
+        self.scroll_layout.addWidget(init_buttons)
+        self.update_container_height()
 
-        QMessageBox.information(
-            self, '안내', "새로운 이미지를 불러올때마다 태그를 읽습니다.\n프롬프트 내에 @@" + mode + "@@를 입력해주세요.\n해당 자리에 삽입됩니다.")
-        return
+    def on_click_inpaint_button(self, src):
+        if self.is_i2i:
+            last_widget = self.scroll_layout.itemAt(0).widget()
+            if isinstance(last_widget, ImageItem):
+                img = QImage(src)
+                mask = self.mask if self.mask else None
 
+                d = InpaintDialog(img, mask)
+                if d.exec_() == QDialog.Accepted:
+                    is_mask_applied = d.mask_only != None
 
+                    last_widget.change_image(d.mask_add, is_mask_applied)
+                    self.mask = d.mask_only
+
+    # i2i는 [img, slider1, slider2, mask_only]
+    # vibe는 [[img, slider1, slider2]]
+    def get_nai_param(self):
+        result = []
+        if self.is_i2i:
+            last_widget = self.scroll_layout.itemAt(0).widget()
+            if isinstance(last_widget, ImageItem):
+                result = last_widget.value()
+
+                if self.mask:
+                    result.append(self.mask)
+        else:
+            for i in range(self.scroll_layout.count()):
+                item = self.scroll_layout.itemAt(i)
+                widget = item.widget()
+                if isinstance(widget, ImageItem):
+                    values = widget.value()
+                    if values[0]:
+                        result.append(values)
+        return result
+        
 def init_image_options_layout(self):
     image_options_layout = QVBoxLayout()
 
     # I2I Settings Group
-    i2i_settings_group = ImageSettingGroup(
-        title="I2I Settings",
-        slider_1=CustomSliderWidget(
-            title="Strength:",
-            min_value=1,
-            max_value=99,
-            default_value="0.01",
-            ui_width=50,
-            mag=100,
-            slider_text_lambda=lambda value: "%.2f" % (value / 100),
-            gui_nobackground=True
-        ),
-        slider_2=CustomSliderWidget(
-            title="   Noise: ",
-            min_value=0,
-            max_value=99,
-            default_value=0,
-            ui_width=50,
-            mag=100,
-            slider_text_lambda=lambda value: "%.2f" % (value / 100),
-            gui_nobackground=True
-        ),
-        func_open_img=lambda: show_file_dialog(self, "img2img"),
-        func_open_folder=lambda: show_openfolder_dialog(self, "img2img"),
-        func_tag_check=lambda: on_click_tagcheckbox(self, "img2img"),
-        add_inpaint_button=True
-    )
+    i2i_settings_group = ImageLayout(self, title="I2I Settings", is_i2i=True)
+    image_options_layout.addWidget(i2i_settings_group )
 
-    def i2i_on_click_removebutton():
-        self.dict_img_batch_target["img2img_foldersrc"] = ""
-        i2i_settings_group.set_image()
-        self.image_options_layout.setStretch(0, 0)
-        if not self.vibe_settings_group.src:
-            self.image_options_layout.setStretch(2, 9999)
+    vibe_settings_group = ImageLayout(self, title="Vibe Settings", is_i2i=False)
+    image_options_layout.addWidget(vibe_settings_group )
 
-    i2i_settings_group.on_click_removebutton = i2i_on_click_removebutton
-    i2i_settings_group.connect_on_click_removebutton(i2i_on_click_removebutton)
-    image_options_layout.addWidget(i2i_settings_group, stretch=0)
-
-    vibe_settings_group = ImageSettingGroup(
-        title="Vibe Settings",
-        slider_1=CustomSliderWidget(
-            title="Information Extracted:",
-            min_value=1,
-            max_value=100,
-            default_value=0,
-            ui_width=50,
-            mag=100,
-            slider_text_lambda=lambda value: "%.2f" % (value / 100),
-            gui_nobackground=True
-        ),
-        slider_2=CustomSliderWidget(
-            title="Reference Strength:   ",
-            min_value=1,
-            max_value=100,
-            default_value=0,
-            ui_width=50,
-            mag=100,
-            slider_text_lambda=lambda value: "%.2f" % (value / 100),
-            gui_nobackground=True
-        ),
-        func_open_img=lambda: show_file_dialog(self, "vibe"),
-        func_open_folder=lambda: show_openfolder_dialog(self, "vibe"),
-        func_tag_check=lambda: on_click_tagcheckbox(self, "vibe"),
-        add_inpaint_button=False
-    )
-
-    def vibe_on_click_removebutton():
-        self.dict_img_batch_target["vibe_foldersrc"] = ""
-        vibe_settings_group.set_image()
-        self.image_options_layout.setStretch(1, 0)
-        if not self.i2i_settings_group.src:
-            self.image_options_layout.setStretch(2, 9999)
-    vibe_settings_group.on_click_removebutton = vibe_on_click_removebutton
-    vibe_settings_group.connect_on_click_removebutton(
-        vibe_on_click_removebutton)
-    image_options_layout.addWidget(vibe_settings_group, stretch=0)
-
-    image_options_layout.addWidget(
-        create_empty(minimum_height=1), stretch=9999)
+    image_options_layout.addStretch()
 
     # Assign
-    self.image_options_layout = image_options_layout
     self.i2i_settings_group = i2i_settings_group
     self.vibe_settings_group = vibe_settings_group
-    self.dict_ui_settings["strength"] = i2i_settings_group.slider_1.edit
-    self.dict_ui_settings["noise"] = i2i_settings_group.slider_2.edit
-    self.dict_ui_settings["reference_information_extracted"] = vibe_settings_group.slider_1.edit
-    self.dict_ui_settings["reference_strength"] = vibe_settings_group.slider_2.edit
+    # self.dict_ui_settings["strength"] = i2i_settings_group.slider_1.edit
+    # self.dict_ui_settings["noise"] = i2i_settings_group.slider_2.edit
+    # self.dict_ui_settings["reference_information_extracted"] = vibe_settings_group.slider_1.edit
+    # self.dict_ui_settings["reference_strength"] = vibe_settings_group.slider_2.edit
 
     return image_options_layout

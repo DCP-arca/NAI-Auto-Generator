@@ -2,17 +2,17 @@ from PyQt5.QtWidgets import QSlider, QLabel, QLineEdit, QHBoxLayout
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIntValidator
 
+
 class CustomSliderWidget(QHBoxLayout):
     def __init__(self, **option_dict):
         assert all(key in option_dict for key in [
-                   "title", "min_value", "max_value", "default_value", "ui_width", "mag", "slider_text_lambda"])
+                   "title", "min_value", "max_value", "default_value", "edit_width", "mag", "slider_text_lambda"])
         super(CustomSliderWidget, self).__init__()
 
         label = QLabel(option_dict["title"])
         slider = QSlider(Qt.Horizontal)
         slider.setMinimum(option_dict["min_value"])
         slider.setMaximum(option_dict["max_value"])
-        slider.setValue(int(float(option_dict["default_value"])))
 
         edit = CustomSliderWidget.CustomLineEdit(option_dict, slider)
 
@@ -26,7 +26,10 @@ class CustomSliderWidget(QHBoxLayout):
             self.addWidget(QLabel("%"))
         self.addWidget(slider)
 
+        self.slider = slider
         self.edit = edit
+        
+        slider.setValue(int(float(option_dict["default_value"])))
 
     class CustomLineEdit(QLineEdit):
         def __init__(self, option_dict, target_slider):
@@ -37,8 +40,8 @@ class CustomSliderWidget(QHBoxLayout):
             self.target_slider = target_slider
             self.slider_text_lambda = option_dict["slider_text_lambda"]
 
-            self.setMinimumWidth(option_dict["ui_width"])
-            self.setMaximumWidth(option_dict["ui_width"])
+            self.setMinimumWidth(option_dict["edit_width"])
+            self.setMaximumWidth(option_dict["edit_width"])
             self.setAlignment(Qt.AlignCenter)
             self.setValidator(QIntValidator(0, 100))
 

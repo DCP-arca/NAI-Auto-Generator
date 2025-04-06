@@ -1,6 +1,7 @@
 
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QSplitter
 
+from gui.layout.model_options_layout import init_model_options_layout
 from gui.layout.resolution_options_layout import init_resolution_options_layout
 from gui.layout.parameter_options_layout import init_parameter_options_layout
 from gui.layout.generate_buttons_layout import GenerateButtonsLayout
@@ -11,7 +12,6 @@ from gui.widget.result_image_view import ResultImageView
 from config.paths import PATH_IMG_NO_IMAGE
 from config.themes import MAIN_STYLESHEET
 
-from util.file_util import resource_path
 from util.ui_util import create_empty, add_button
 
 from gui.layout.image_options_layout import init_image_options_layout
@@ -53,6 +53,7 @@ def init_main_layout(self):
     vbox_option = QVBoxLayout()
     vbox_lower_settings.addLayout(vbox_option, stretch=1)
 
+    vbox_option.addLayout(init_model_options_layout(self), stretch=1)
     vbox_option.addLayout(init_resolution_options_layout(self), stretch=1)
     vbox_option.addLayout(init_parameter_options_layout(self), stretch=1)
     vbox_option.addLayout(init_image_options_layout(self), stretch=999)
@@ -77,7 +78,7 @@ def init_main_layout(self):
     vbox_expand.setContentsMargins(30, 30, 30, 30)
     widget_right.setLayout(vbox_expand)
 
-    image_result = ResultImageView(resource_path(PATH_IMG_NO_IMAGE))
+    image_result = ResultImageView(PATH_IMG_NO_IMAGE)
     image_result.setStyleSheet("""
         background-color: white;
         background-position: center

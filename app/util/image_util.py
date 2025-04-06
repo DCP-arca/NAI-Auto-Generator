@@ -71,7 +71,7 @@ def convert_src_to_imagedata(img_path, quality=100):
     try:
         img = Image.open(img_path)
         buf = io.BytesIO()
-        img.save(buf, format='png', quality=100)
+        img.save(buf, format='png', quality=quality)
         return base64.b64encode(buf.getvalue()).decode("utf-8")
     except Exception as e:
         return ""

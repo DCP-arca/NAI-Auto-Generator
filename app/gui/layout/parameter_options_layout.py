@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QGroupBox, QLabel, QLineEdit, QCheckBox, QVBoxLayout
 
 from gui.widget.custom_slider_widget import CustomSliderWidget
 
-from config.consts import SAMPLER_ITEMS
+from core.worker.nai_generator import SAMPLER_ITEMS_V4
 
 
 def init_parameter_options_layout(self):
@@ -21,7 +21,7 @@ def init_parameter_options_layout(self):
         min_value=1,
         max_value=50,
         default_value=28,
-        ui_width=35,
+        edit_width=35,
         mag=1,
         slider_text_lambda=lambda value: "%d" % value
     )
@@ -47,7 +47,7 @@ def init_parameter_options_layout(self):
     sampler_layout = QVBoxLayout()
     sampler_layout.addWidget(QLabel("샘플러(Sampler)"))
     sampler_combo = QComboBox()
-    sampler_combo.addItems(SAMPLER_ITEMS)
+    sampler_combo.addItems(SAMPLER_ITEMS_V4)
     self.dict_ui_settings["sampler"] = sampler_combo
     sampler_layout.addWidget(sampler_combo)
     lower_slider_layout.addLayout(seed_layout)
@@ -82,7 +82,7 @@ def init_parameter_options_layout(self):
         min_value=0,
         max_value=100,
         default_value=5.0,
-        ui_width=40,
+        edit_width=40,
         mag=10,
         slider_text_lambda=lambda value: "%.1f" % (value / 10)
     )
@@ -94,7 +94,7 @@ def init_parameter_options_layout(self):
         min_value=0,
         max_value=100,
         default_value="0.00",
-        ui_width=50,
+        edit_width=50,
         mag=100,
         slider_text_lambda=lambda value: "%.2f" % (value / 100)
     )

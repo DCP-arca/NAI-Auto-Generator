@@ -34,12 +34,3 @@ def create_windows_filepath(base_path, filename, extension, max_length=150):
     filepath = os.path.join(base_path, cleaned_filename + extension)
 
     return filepath
-
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path).replace("\\", "/")

@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QPushButton
+from PyQt5.QtWidgets import QWidget, QPushButton, QGraphicsOpacityEffect
 
 def create_empty(minimum_width=1, minimum_height=1, fixed_height=0, maximum_height=0):
     w = QWidget()
@@ -23,3 +23,9 @@ def add_button(hbox, text, callback, minimum_width=-1, maximum_width=-1, maximum
         button.setMaximumHeight(maximum_height)
     hbox.addWidget(button)
     return button
+
+
+def set_opacity(widget, opacity):
+    opacity_effect = QGraphicsOpacityEffect(widget)
+    opacity_effect.setOpacity(opacity)  # 0은 완전히 투명함을 의미함
+    widget.setGraphicsEffect(opacity_effect)

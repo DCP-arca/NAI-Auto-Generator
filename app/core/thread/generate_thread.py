@@ -19,7 +19,7 @@ def _threadfunc_generate_image(thread_self, path):
     nai = parent.nai
     data = nai.generate_image()
     if not data:
-        return 1, "서버에서 정보를 가져오는데 실패했습니다."  # 실패 메시지냐아~
+        return 1, "서버에서 정보를 가져오는데 실패했습니다."
 
     try:
         zipped = zipfile.ZipFile(io.BytesIO(data))
@@ -30,21 +30,14 @@ def _threadfunc_generate_image(thread_self, path):
 
     create_folder_if_not_exists(path)
     dst = ""
-    if parent.dict_img_batch_target["img2img_foldersrc"] and strtobool(parent.settings.value("will_savename_i2i", False)):
-        filename = get_filename_only(parent.i2i_settings_group.src)
-        extension = ".png"
-        dst = os.path.join(path, filename + extension)
-        while os.path.isfile(dst):
-            filename += "_"
-            dst = os.path.join(path, filename + extension)
-    else:
-        timename = datetime.datetime.now().strftime("%y%m%d_%H%M%S%f")[:-4]
-        filename = timename
-        if strtobool(parent.settings.value("will_savename_prompt", True)):
-            filename += "_" + nai.parameters["prompt"]
-        dst = create_windows_filepath(path, filename, ".png")
-        if not dst:
-            dst = timename
+    timename = datetime.datetime.now().strftime("%y%m%d_%H%M%S%f")[:-4]
+    filename = timename
+    if strtobool(parent.settings.value("will_savename_prompt", True)):
+        filename += "_" + nai.parameters["prompt"]
+    dst = create_windows_filepath(path, filename, ".png")
+    if not dst:
+        dst = timename
+
     try:
         img.save(dst)
     except Exception as e:

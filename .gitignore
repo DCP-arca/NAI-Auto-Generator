@@ -1,4 +1,7 @@
-build/
+build/dist/
+build/dist_onefile/
+build/dist_release_zip/
+build/_pyinstaller_build/
 mine/
 __pycache__
 *.spec
@@ -6,3 +9,4 @@ assets/ART_WORK/
 .venv/
 .venv_test/
 *.ini
+.vscode

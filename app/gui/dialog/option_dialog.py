@@ -139,12 +139,6 @@ class OptionDialog(QDialog):
         self.checkbox_savepname = checkbox_savepname
         layout.addWidget(checkbox_savepname)
 
-        checkbox_savei2iname = QCheckBox("i2i 폴더모드 적용시 원본 파일 이름 사용하기")
-        checkbox_savei2iname.setChecked(strtobool(
-            parent.settings.value("will_savename_i2i", False)))
-        self.checkbox_savei2iname = checkbox_savei2iname
-        layout.addWidget(checkbox_savei2iname)
-
         button_close = QPushButton("닫기")
         button_close.clicked.connect(self.on_click_close_button)
         self.button_close = button_close
@@ -202,8 +196,6 @@ class OptionDialog(QDialog):
             "will_complete_tag", self.checkbox_completeoff.isChecked())
         self.parent().settings.setValue(
             "will_savename_prompt", self.checkbox_savepname.isChecked())
-        self.parent().settings.setValue(
-            "will_savename_i2i", self.checkbox_savei2iname.isChecked())
         self.reject()
 
 

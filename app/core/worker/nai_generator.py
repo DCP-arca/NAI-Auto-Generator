@@ -17,12 +17,25 @@ MODEL_NAME_DICT = {
     "NAI Diffusion V4 Curated": "nai-diffusion-4-curated-preview"
 }
 
+MODEL_NAME_INPANT_DIC = {
+    "nai-diffusion-3": "nai-diffusion-3-inpainting",
+    "nai-diffusion-4-curated-preview": "nai-diffusion-4-curated-inpainting",
+    "nai-diffusion-4-full": "nai-diffusion-4-full-inpainting"
+}
 
+SAMPLER_ITEMS_V3 = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2s_ancestral', "k_dpmpp_2m_sde", 
+				 "k_dpmpp_2m", 'k_dpmpp_sde', "ddim_v3"]
+
+SAMPLER_ITEMS_V4 = ['k_euler_ancestral', 'k_dpmpp_2s_ancestral', "k_dpmpp_2m_sde",
+                 'k_euler', "k_dpmpp_2m",'k_dpmpp_sde']
+
+# 이 dict에 있는 값만 설정 가능.
 TARGET_PARAMETERS = {
+    "model": "k_euler_ancestral",
     "prompt": "1girl",
     "negative_prompt": "worst quality",
-    "width": 512,
-    "height": 512,
+    "width": 640,
+    "height": 640,
     "noise_schedule": "karras",
     "sampler": "k_euler_ancestral",
     "steps": 25,
@@ -32,24 +45,16 @@ TARGET_PARAMETERS = {
     "sm": True,
     "sm_dyn": True,
     "variety_plus": True,
-    "image": None,
-    "mask": None,
-    "reference_image_multiple": [],
-    "reference_information_extracted_multiple": [],
-    "reference_strength_multiple": [],
+    "image": "",  # i2i image
+    "mask": "",  # inpant mask
+    "strength": 0.7,  # i2i 세팅값1
+    "noise": 0.0,  # i2i 세팅값2
+    "reference_image_multiple": [],  # 바이브 이미지
+    "reference_information_extracted_multiple": [0],  # 바이브 세팅값1
+    "reference_strength_multiple": [0],  # 바이스 세팅값2
     "legacy_uc": False,
-    "characterPrompts": [
-        {
-            "prompt": "boy, ",
-            "uc": "lowres, aliasing, ",
-            "center": {
-                "x": 0.1,
-                "y": 0.5
-            },
-            "enabled": True
-        }
-    ],
-    "use_coords": False
+    "use_coords": False,
+    "characterPrompts": []  # DEFAULT_PARAMETER_CHARPROMPTS를 생성해서 넣어야함.
 }
 
 
@@ -97,6 +102,7 @@ V3_PARAMETERS = {
     "skip_cfg_above_sigma": None,
     "use_coords": False,
     "seed": 9999999999,
+    "extra_noise_seed":9999999999,
     "characterPrompts": [],
     "prompt": "1girl",
     "negative_prompt": "nsfw, lowres, {bad}, error, fewer, extra, missing, worst quality, jpeg artifacts, bad quality, watermark, unfinished, displeasing, chromatic aberration, signature, extra digits, artistic error, username, scan, [abstract], 3d, blender, pixel art, realistic, blurry, lowres, error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, multiple views, logo, too many watermarks, white blank page, blank page, {{{worst quality, bad quality}}}, normal quality, very displeasing, censored, displeasing, gundam, furry, simple background, logo, sign, glitch, sketch, simple coloring",
@@ -130,7 +136,7 @@ V4_PARAMETERS = {
     "v4_prompt": {
         "caption": {
             "base_caption": "1girl",
-            "char_captions": []
+            "char_captions": [],
         },
         "use_coords": True,
         "use_order": True
@@ -144,6 +150,7 @@ V4_PARAMETERS = {
     },
     "legacy_uc": False,
     "seed": 9999999999,
+    "extra_noise_seed":9999999999,
     "characterPrompts": [],
     "negative_prompt": "3d, blender, pixel art, realistic, blurry, lowres, error, film grain, scan artifacts, worst quality, bad quality, jpeg artifacts, very displeasing, chromatic aberration, multiple views, logo, too many watermarks, white blank page, blank page, {{{worst quality, bad quality}}}, normal quality, very displeasing, censored, displeasing, gundam, furry, simple background, logo, sign, glitch, sketch, simple coloring",
     "reference_image_multiple": [],
@@ -178,7 +185,7 @@ def _complete_v4_parameters(parameters):
     parameters["v4_prompt"]["caption"]["base_caption"] = parameters["prompt"]
 
     # prompt -> use_coords
-    parameters["v4_prompt"]["caption"]["use_coords"] = parameters["use_coords"]
+    parameters["v4_prompt"]["use_coords"] = parameters["use_coords"]
 
     # negative prompt
     parameters["v4_negative_prompt"]["caption"]["base_caption"] = parameters["negative_prompt"]
@@ -197,19 +204,34 @@ def _complete_v4_parameters(parameters):
             parent = parameters[target]["caption"]["char_captions"]
             parent.append(new_char_dict)
 
+    # 바이브도 제거함
+    parameters["reference_image_multiple"] = []
+    parameters["reference_information_extracted_multiple"]= []
+    parameters["reference_strength_multiple"]= []
+
+    # 다음이 포함되어있으면 작동이 안됨.
+    del parameters["sm"]
+    del parameters["sm_dyn"]
+    del parameters["variety_plus"]
+
+def is_now_model_v4(model_key):
+    if model_key == "NAI Diffusion V4 Full" or model_key == "NAI Diffusion V4 Curated" or model_key == "nai-diffusion-4-full" or model_key == "nai-diffusion-4-curated-preview":
+        return True
+    else:
+        return False
 
 class NAIGenerator():
     def __init__(self):
         self.access_token = None
         self.username = None
         self.password = None
-        self.model_key = "nai-diffusion-4-full"
         self.parameters = {}
 
-    def set_model_name(self, model_name):
-        self.model_key = MODEL_NAME_DICT[model_name]
-
     def set_param_dict(self, param_dict):
+        allowedKeyList = TARGET_PARAMETERS.keys()
+        for key in param_dict.keys():
+            assert key in allowedKeyList, "[NAIGenerator.set_param_dict] 허용되지않은 키가 있습니다. " + key
+
         self.parameters = param_dict
 
     def try_login(self, username, password):
@@ -248,25 +270,21 @@ class NAIGenerator():
         return None
 
     def generate_image(self):
-        model = self.model_key
-
-        # 패러미터 업데이트
         parameters = {}
 
-        isV4 = False
+        # model
+        model = self.parameters["model"]
+        if model in MODEL_NAME_DICT:
+            model = MODEL_NAME_DICT[model]
+        isV4 = is_now_model_v4(model)
 
         # action
         action = "generate"
-        if self.model_key == "nai-diffusion-4-full" or self.model_key == "nai-diffusion-4-curated-preview":
-            isV4 = False
-            action = "generate"  # 4는 강제 generate
-        else:  # 3의 경우
-            isV4 = True
-            if self.parameters["image"]:
-                action = "img2img"
-            if self.parameters['mask']:
-                self.model_key = "nai-diffusion-3-inpainting"
-                action = "infill"
+        if "image" in self.parameters and self.parameters['image']:
+            action = "img2img"
+        if 'mask' in self.parameters and self.parameters['mask']:
+            action = "infill"
+            model = MODEL_NAME_INPANT_DIC[model]
 
         # parameter 생성
         if isV4:
@@ -275,6 +293,14 @@ class NAIGenerator():
             parameters = V3_PARAMETERS.copy()
         parameters.update(self.parameters)
 
+        # extraseed 통일
+        parameters["extra_noise_seed"] = parameters["seed"]
+
+        # smea 버그 수정
+        if "image" in parameters or parameters['sampler'] == 'ddim_v3':
+            parameters['sm'] = False
+            parameters['sm_dyn'] = False
+
         # v4는 추가 수정함.
         if isV4:
             _complete_v4_parameters(parameters)
@@ -282,11 +308,11 @@ class NAIGenerator():
         try:
             response = requests.post(url=BASE_URL_IMAGE,
                                      json={
-                                         "input": parameters["prompt"],
-                                         "model": model,
-                                         "action": action,
-                                         "parameters": parameters
-                                     },
+                                        "input": parameters["prompt"],
+                                        "model": model,
+                                        "action": action,
+                                        "parameters": parameters
+                                    },
                                      headers={
                                          "Authorization": f"Bearer " + self.access_token}
                                      )
@@ -304,26 +330,3 @@ class NAIGenerator():
         except Exception as e:
             print(e)
         return (access_result is not None)
-
-
-if __name__ == "__main__":
-    import configparser
-    config = configparser.ConfigParser()
-    config.read('../../../mine/testsetting.ini')
-    username = config['USER']['username']
-    password = config['USER']['password']
-
-    naiG = NAIGenerator()
-
-    is_login_success = naiG.try_login(username, password)
-
-    if is_login_success:
-        print(naiG.get_anlas())
-
-        img = naiG.generate_image()
-
-        print(img)
-        zipped = zipfile.ZipFile(io.BytesIO(img))
-        image_bytes = zipped.read(zipped.infolist()[0])
-        img = Image.open(io.BytesIO(image_bytes))
-        img.save(r"testresult.png")

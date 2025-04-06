@@ -27,18 +27,17 @@ from gui.dialog.option_dialog import OptionDialog
 from gui.dialog.etc_dialog import show_setting_load_dialog, show_setting_save_dialog
 
 from util.common_util import strtobool
-from util.image_util import pick_imgsrc_from_foldersrc, convert_qimage_to_imagedata, convert_src_to_imagedata
-from util.string_util import apply_wc_and_lessthan, inject_imagetag
-from util.file_util import create_folder_if_not_exists, get_imgcount_from_foldersrc
-from util.tagger_util import predict_tag_from
+from util.string_util import apply_wc_and_lessthan
+from util.file_util import create_folder_if_not_exists
+from util.ui_util import set_opacity
 
 from core.worker.naiinfo_getter import get_naidict_from_file, get_naidict_from_txt, get_naidict_from_img
-from core.worker.nai_generator import NAIGenerator
+from core.worker.nai_generator import NAIGenerator, is_now_model_v4, TARGET_PARAMETERS, SAMPLER_ITEMS_V4, SAMPLER_ITEMS_V3
 from core.worker.wildcard_applier import WildcardApplier
 from core.worker.danbooru_tagger import DanbooruTagger
 
 from config.strings import STRING
-from config.consts import DEFAULT_PARAMS, RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, TITLE_NAME, TOP_NAME, APP_NAME, MAX_COUNT_FOR_WHILELOOP
+from config.consts import RESOLUTION_FAMILIY_MASK, RESOLUTION_FAMILIY, TITLE_NAME, TOP_NAME, APP_NAME
 from config.paths import DEFAULT_PATH
 
 
@@ -52,7 +51,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_statusbar()
         self.init_menubar()
         self.init_content()
-        self.load_data()
         self.check_folders()
         self.show()
 
@@ -60,6 +58,8 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.init_wc()
         self.init_tagger()
         self.init_completion()
+        
+        self.load_data()
 
     def init_variable(self):
         self.is_expand = False
@@ -67,16 +67,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.autogenerate_thread = None
         self.list_settings_batch_target = []
         self.index_settings_batch_target = -1
-        self.dict_img_batch_target = {
-            "img2img_foldersrc": "",
-            "img2img_index": -1,
-            "i2i_last_src": "",
-            "i2i_last_dst": "",
-            "vibe_foldersrc": "",
-            "vibe_index": -1,
-            "vibe_last_src": "",
-            "vibe_last_dst": "",
-        }
 
     def init_window(self):
         self.setWindowTitle(TITLE_NAME)
@@ -132,7 +122,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
             CompletionTagLoadThread(self).start()
 
     def save_data(self):
-        data_dict = self.get_data()
+        data_dict = self.get_data_from_savetarget_ui()
 
         data_dict["seed_fix_checkbox"] = self.dict_ui_settings["seed_fix_checkbox"].isChecked()
 
@@ -142,25 +132,32 @@ class NAIAutoGeneratorWindow(QMainWindow):
     def set_data(self, data_dict):
         dict_ui = self.dict_ui_settings
 
-        dict_ui["sampler"].setCurrentText(data_dict["sampler"])
+        list_ui_using_setcurrenttext = ["model", "sampler"]
+        for key in list_ui_using_setcurrenttext:
+            if key in data_dict:
+                dict_ui[key].setCurrentText(str(data_dict[key]))
+            else:
+                print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
         list_ui_using_settext = ["prompt", "negative_prompt", "width", "height",
-                                 "steps", "seed", "scale", "cfg_rescale",
-                                 "strength", "noise", "reference_information_extracted", "reference_strength"]
+                                 "steps", "seed", "scale", "cfg_rescale"]
         for key in list_ui_using_settext:
             if key in data_dict:
                 dict_ui[key].setText(str(data_dict[key]))
             else:
-                print(key)
+                print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
         list_ui_using_setchecked = ["sm", "sm_dyn"]
         for key in list_ui_using_setchecked:
-            dict_ui[key].setChecked(strtobool(data_dict[key]))
+            if key in data_dict:
+                dict_ui[key].setChecked(strtobool(data_dict[key]))
+            else:
+                print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
     def load_data(self):
         data_dict = {}
-        for key in DEFAULT_PARAMS:
-            data_dict[key] = str(self.settings.value(key, DEFAULT_PARAMS[key]))
+        for key in TARGET_PARAMETERS:
+            data_dict[key] = str(self.settings.value(key, TARGET_PARAMETERS[key]))
 
         self.set_data(data_dict)
 
@@ -169,8 +166,10 @@ class NAIAutoGeneratorWindow(QMainWindow):
             path = self.settings.value(key, os.path.abspath(default_path))
             create_folder_if_not_exists(path)
 
-    def get_data(self, do_convert_type=False):
+    # 저장 대상인 항목만 이곳에 담는다.
+    def get_data_from_savetarget_ui(self, do_convert_type=False):
         data = {
+            "model": self.dict_ui_settings["model"].currentText(),
             "prompt": self.dict_ui_settings["prompt"].toPlainText(),
             "negative_prompt": self.dict_ui_settings["negative_prompt"].toPlainText(),
             "width": self.dict_ui_settings["width"].text(),
@@ -183,10 +182,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "sm": str(self.dict_ui_settings["sm"].isChecked()),
             "sm_dyn": str(self.dict_ui_settings["sm_dyn"].isChecked()),
             "variety_plus": str(self.dict_ui_settings["variety_plus"].isChecked()),
-            "strength": self.dict_ui_settings["strength"].text(),
-            "noise": self.dict_ui_settings["noise"].text(),
-            "reference_information_extracted": self.dict_ui_settings["reference_information_extracted"].text(),
-            "reference_strength": self.dict_ui_settings["reference_strength"].text(),
         }
 
         if do_convert_type:
@@ -199,23 +194,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
             data["sm"] = strtobool(data["sm"])
             data["sm_dyn"] = strtobool(data["sm_dyn"])
             data["variety_plus"] = strtobool(data["variety_plus"])
-            data["strength"] = float(data["strength"])
-            data["noise"] = float(data["noise"])
-            data["reference_information_extracted"] = float(
-                data["reference_information_extracted"])
-            data["reference_strength"] = float(data["reference_strength"])
 
         return data
 
     # Warning! Don't interact with pyqt gui in this function
+    # ui에서 데이터를 가져온 다음에 생성전 수정을 가한다.
     def _get_data_for_generate(self):
-        data = self.get_data(True)
+        data = self.get_data_from_savetarget_ui(True)
         self.save_data()
-
-        # sampler check
-        if data['sampler'] == 'ddim_v3':
-            data['sm'] = False
-            data['sm_dyn'] = False
 
         # data precheck
         self.check_folders()
@@ -238,57 +224,47 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 data["width"], data["height"] = int(width), int(height)
 
         # image option check
-        data["image"] = None
-        data["reference_image"] = None
-        data["mask"] = None
-        if self.i2i_settings_group.src:
-            imgdata_i2i = convert_src_to_imagedata(
-                self.i2i_settings_group.src)
-            if imgdata_i2i:
-                data["image"] = imgdata_i2i
-                # 만약 i2i가 켜져있다면
-                # sm설정을 반드시 꺼야함. 안그러면 흐릿하게 나옴.
-                data['sm'] = False
-                data['sm_dyn'] = False
+        i2i_param = self.i2i_settings_group.get_nai_param()
+        vibe_param = self.vibe_settings_group.get_nai_param()
+        if i2i_param:
+            data["image"] = i2i_param[0]
+            data["strength"] = float(i2i_param[1])
+            data["noise"] = float(i2i_param[2])
 
-                # mask 체크
-                if self.i2i_settings_group.mask:
-                    data['mask'] = convert_qimage_to_imagedata(
-                        self.i2i_settings_group.mask)
-            else:
-                self.i2i_settings_group.on_click_removebutton()
-        if self.vibe_settings_group.src:
-            imgdata_vibe = convert_src_to_imagedata(
-                self.vibe_settings_group.src)
-            if imgdata_vibe:
-                data["reference_image"] = imgdata_vibe
-            else:
-                self.vibe_settings_group.on_click_removebutton()
-
-        # i2i 와 vibe 세팅
-        batch = self.dict_img_batch_target
-        for mode_str in ["i2i", "vibe"]:
-            target_group = self.i2i_settings_group if mode_str == "i2i" else self.vibe_settings_group
-
-            if target_group.tagcheck_checkbox.isChecked():
-                if target_group.src:
-                    if batch[mode_str + "_last_src"] != target_group.src:
-                        batch[mode_str + "_last_src"] = target_group.src
-                        batch[mode_str + "_last_dst"] = predict_tag_from(self,
-                                                                         "src", target_group.src, False)
-                        if not batch[mode_str + "_last_dst"]:
-                            batch[mode_str + "_last_src"] = ""
-                            batch[mode_str + "_last_dst"] = ""
-
-                    data["prompt"] = inject_imagetag(
-                        data["prompt"], "img2img" if mode_str == "i2i" else "vibe", batch[mode_str + "_last_dst"])
-                    data["negative_prompt"] = inject_imagetag(
-                        data["negative_prompt"], "img2img" if mode_str == "i2i" else "vibe", batch[mode_str + "_last_dst"])
-            else:
-                batch[mode_str + "_last_src"] = ""
-                batch[mode_str + "_last_dst"] = ""
-
+            # mask 체크
+            # if self.i2i_settings_group.mask:
+            #     data['mask'] = convert_qimage_to_imagedata(
+            #         self.i2i_settings_group.mask)
+        if vibe_param:
+            image_tuple, info_tuple, strength_tuple = zip(*vibe_param)
+            data["reference_image_multiple"]= list(image_tuple)
+            data["reference_information_extracted_multiple"]= [float(x) for x in info_tuple]
+            data["reference_strength_multiple"]= [float(x) for x in strength_tuple]
+        
         return data
+        
+    def on_model_changed(self, text):
+        isV4 = is_now_model_v4(text)
+
+        # sampler
+        sampler_ui = self.dict_ui_settings["sampler"]
+        prevText = sampler_ui.currentText()
+
+        sampler_ui.clear()
+        targetItems = SAMPLER_ITEMS_V4 if isV4 else SAMPLER_ITEMS_V3
+        sampler_ui.addItems(targetItems)
+
+        if prevText in targetItems:
+            sampler_ui.setCurrentText(prevText)
+        
+        # vibe off
+        self.vibe_settings_group.setVisible(not isV4)
+
+        # settings off
+        opacity = 0 if isV4 else 1
+        set_opacity(self.dict_ui_settings["sm"], opacity)
+        set_opacity(self.dict_ui_settings["sm_dyn"], opacity)
+        set_opacity(self.dict_ui_settings["variety_plus"], opacity)
 
     def _on_after_create_data_apply_gui(self):
         data = self.nai.parameters
@@ -330,11 +306,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         if error_code == 0:
             self.image_result.set_custom_pixmap(result)
-
-            if self.dict_img_batch_target["img2img_foldersrc"]:
-                self.proceed_image_batch("img2img")
-            if self.dict_img_batch_target["vibe_foldersrc"]:
-                self.proceed_image_batch("vibe")
         else:
             QMessageBox.information(
                 self, '경고', "이미지를 생성하는데 문제가 있습니다.\n\n" + str(result))
@@ -356,22 +327,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
                     return
 
             self.on_click_generate_auto(path_list)
-
-    def proceed_image_batch(self, mode):
-        self.dict_img_batch_target[mode + "_index"] += 1
-        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
-
-        src, is_reset = pick_imgsrc_from_foldersrc(
-            foldersrc=self.dict_img_batch_target[mode + "_foldersrc"],
-            index=self.dict_img_batch_target[mode + "_index"],
-            sort_order=target_group.get_folder_sort_mode()
-        )
-
-        if is_reset:
-            seed = random.randint(0, 9999999999)
-            self.dict_ui_settings["seed"].setText(str(seed))
-
-        self._set_image_gui(mode, src)
 
     def proceed_settings_batch(self):
         self.index_settings_batch_target += 1
@@ -431,10 +386,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         self.image_result.set_custom_pixmap(result_str)
 
-        if self.dict_img_batch_target["img2img_foldersrc"]:
-            self.proceed_image_batch("img2img")
-        if self.dict_img_batch_target["vibe_foldersrc"]:
-            self.proceed_image_batch("vibe")
         if self.list_settings_batch_target:
             self.proceed_settings_batch()
 
@@ -626,35 +577,6 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         self.set_auto_login(False)
 
-    def _set_image_gui(self, mode, src):
-        if mode == "img2img":
-            self.i2i_settings_group.set_image(src)
-            self.image_options_layout.setStretch(0, 1)
-        if mode == "vibe":
-            self.vibe_settings_group.set_image(src)
-            self.image_options_layout.setStretch(1, 1)
-        self.image_options_layout.setStretch(2, 0)
-
-    def set_image_as_param(self, mode, src):
-        self.dict_img_batch_target[mode + "_foldersrc"] = ""
-        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
-        target_group.set_folder_mode(False)
-        self._set_image_gui(mode, src)
-
-    def set_imagefolder_as_param(self, mode, foldersrc):
-        if get_imgcount_from_foldersrc(foldersrc) == 0:
-            QMessageBox.information(
-                self, '경고', "이미지 파일이 없는 폴더입니다")
-            return
-
-        target_group = self.i2i_settings_group if mode == "img2img" else self.vibe_settings_group
-        target_group.set_folder_mode(True)
-
-        self.dict_img_batch_target[mode + "_foldersrc"] = foldersrc
-        self.dict_img_batch_target[mode + "_index"] = -1
-
-        self.proceed_image_batch(mode)
-
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
             event.accept()
@@ -671,29 +593,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         furl = files[0]
         if furl.isLocalFile():
             fname = furl.toLocalFile()
-            if fname.endswith(".png") or fname.endswith(".webp") or fname.endswith(".jpg"):
-                if self.i2i_settings_group.geometry().contains(event.pos()):
-                    self.set_image_as_param("img2img", fname)
-                    return
-                elif self.vibe_settings_group.geometry().contains(event.pos()):
-                    self.set_image_as_param("vibe", fname)
-                    return
-                elif not fname.endswith(".jpg"):
+            if fname.endswith(".png") or fname.endswith(".webp"):
+                if not fname.endswith(".jpg"):
                     self.get_image_info_bysrc(fname)
                     return
             elif fname.endswith(".txt"):
                 self.get_image_info_bytxt(fname)
                 return
-            elif os.path.isdir(fname):
-                if self.i2i_settings_group.geometry().contains(event.pos()):
-                    self.set_imagefolder_as_param("img2img", fname)
-                    return
-                elif self.vibe_settings_group.geometry().contains(event.pos()):
-                    self.set_imagefolder_as_param("vibe", fname)
-                    return
 
             QMessageBox.information(
-                self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.\ni2i와 vibe를 사용하고 싶다면 해당 칸에 떨어트려주세요.")
+                self, '경고', "세팅 불러오기는 png, webp, txt 파일만 가능합니다.")
         else:
             self.statusbar.set_statusbar_text("LOADING")
             try:
@@ -703,7 +612,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 if img:
                     self.get_image_info_byimg(img)
 
-            except Exception as e:
+            except Exception as e:                             # 바이브 이미지
                 print(e)
                 self.statusbar.set_statusbar_text("IDLE")
                 QMessageBox.information(self, '경고', "이미지 파일 다운로드에 실패했습니다.")

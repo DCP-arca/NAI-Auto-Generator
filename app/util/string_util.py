@@ -75,6 +75,8 @@ def inject_imagetag(original_str, tagname, additional_str):
 
 
 def prettify_naidict(nai_dict):
+    nai_dict = nai_dict.copy()
+
     desired_order = [
         "prompt",
         "negative_prompt",
@@ -89,15 +91,16 @@ def prettify_naidict(nai_dict):
         "seed",
         "strength",
         "noise",
-        "reference_information_extracted",
-        "reference_strength",
+        "reference_information_extracted_multiple",
+        "reference_strength_multiple",
         "v4_prompt",
         "v4_negative_prompt"
     ]
 
     ban_keys = [
-        "image"
-        "reference_image"
+        "image",
+        "reference_image",
+        "reference_image_multiple"
     ]
     
     # 먼저 순서대로 정렬할 딕셔너리 만들기
@@ -108,9 +111,16 @@ def prettify_naidict(nai_dict):
     
     # 남은 키들도 자동으로 추가해주기
     for key in nai_dict:
-        if key not in ordered_dict and key not in ban_keys:
+        if key not in ordered_dict and key:
             ordered_dict[key] = nai_dict[key]
+
+    # ban_keys 작업
+    for key in ordered_dict:
+        if key in ban_keys:
+            ordered_dict[key] = "True"
+            
 
     content = json.dumps(ordered_dict, indent=4)
     content = content.replace("\\n", "\n")
+
     return content
