@@ -1,5 +1,5 @@
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QSplitter
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGroupBox, QSplitter, QLabel
 
 from gui.layout.model_options_layout import init_model_options_layout
 from gui.layout.resolution_options_layout import init_resolution_options_layout
@@ -54,6 +54,7 @@ def init_main_layout(self):
     vbox_option.addLayout(init_resolution_options_layout(self), stretch=1)
     vbox_option.addLayout(init_parameter_options_layout(self), stretch=1)
     vbox_option.addLayout(init_image_options_layout(self), stretch=999)
+    vbox_option.addWidget(QLabel("* 모델이 지원하지 않는 패러미터는 무시됩니다."))
 
     vbox_lower_settings.addWidget(create_empty(minimum_width=5))
 

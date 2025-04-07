@@ -20,7 +20,12 @@ PATH_IMG_GETTER = resource_path("assets/getter.png")
 PATH_IMG_ICON = resource_path("assets/icon.png")
 PATH_IMG_ICON_GETTER = resource_path("assets/icon_getter.png")
 PATH_IMG_ICON_TAGGER = resource_path("assets/icon_tagger.png")
-PATH_CSV_TAG_COMPLETION = resource_path("assets/danbooru_tags_post_count.csv")
+
+try:
+    base_path = sys._MEIPASS
+    PATH_CSV_TAG_COMPLETION = "danbooru_tags_post_count.csv"
+except Exception:
+    PATH_CSV_TAG_COMPLETION = "assets/danbooru_tags_post_count.csv"
 
 DEFAULT_PATH = {
     "path_results": "results/",
