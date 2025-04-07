@@ -95,7 +95,7 @@ class LoginDialog(QDialog):
         password = self.password_edit.text()
 
         self.instruct_label.setText("로그인 시도 중... 창을 닫지 마세요.")
-        self.parent.set_statusbar_text("LOGGINGIN")
+        self.parent.statusbar.set_statusbar_text("LOGGINGIN")
         self.login_button.setDisabled(True)
         self.logout_button.setDisabled(True)
 
