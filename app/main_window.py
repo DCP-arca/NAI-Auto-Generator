@@ -26,13 +26,13 @@ from gui.dialog.login_dialog import LoginDialog
 from gui.dialog.option_dialog import OptionDialog
 from gui.dialog.etc_dialog import show_setting_load_dialog, show_setting_save_dialog
 
-from util.common_util import strtobool
-from util.string_util import apply_wc_and_lessthan
+from util.common_util import strtobool, try_dumps, try_loads
+from util.string_util import apply_wc_and_lessthan, prettify_naidict
 from util.file_util import create_folder_if_not_exists
 from util.ui_util import set_opacity
 
 from core.worker.naiinfo_getter import get_naidict_from_file, get_naidict_from_txt, get_naidict_from_img
-from core.worker.nai_generator import NAIGenerator, is_now_model_v4, TARGET_PARAMETERS, SAMPLER_ITEMS_V4, SAMPLER_ITEMS_V3
+from core.worker.nai_generator import NAIGenerator, is_now_model_v4, get_character_prompts_from_v4_prompt, TARGET_PARAMETERS, SAMPLER_ITEMS_V4, SAMPLER_ITEMS_V3, MODEL_NAME_DICT, DEFAULT_MODEL_V4
 from core.worker.wildcard_applier import WildcardApplier
 from core.worker.danbooru_tagger import DanbooruTagger
 
@@ -118,48 +118,105 @@ class NAIAutoGeneratorWindow(QMainWindow):
             "path_models", os.path.abspath(DEFAULT_PATH["path_models"])))
 
     def init_completion(self):
+        self.completiontag_list = None
         if strtobool(self.settings.value("will_complete_tag", True)):
             CompletionTagLoadThread(self).start()
 
+    # 저장과 불러오기는 항상 str으로 한다.
     def save_data(self):
         data_dict = self.get_data_from_savetarget_ui()
 
         data_dict["seed_fix_checkbox"] = self.dict_ui_settings["seed_fix_checkbox"].isChecked()
 
         for k, v in data_dict.items():
-            self.settings.setValue(k, v)
+            if k == "characterPrompts":
+                self.settings.setValue(k, try_dumps(v) or TARGET_PARAMETERS[k])
+            else:
+                self.settings.setValue(k, str(v))
+
+    # 저장과 불러오기는 항상 str으로 한다.
+    def load_data(self):
+        data_dict = {}
+        for key in TARGET_PARAMETERS:
+            if key == "characterPrompts":
+                data_dict["characterPrompts"] = self.settings.value("characterPrompts", TARGET_PARAMETERS[key])
+                if isinstance(data_dict["characterPrompts"], str):
+                    data_dict["characterPrompts"] = try_loads(data_dict["characterPrompts"]) or TARGET_PARAMETERS[key]
+            else:
+                data_dict[key] = self.settings.value(key, TARGET_PARAMETERS[key])
+
+        self.set_data(data_dict)
 
     def set_data(self, data_dict):
-        dict_ui = self.dict_ui_settings
+        ui_dict = self.dict_ui_settings
 
+        # Combo : setCurrentText
         list_ui_using_setcurrenttext = ["model", "sampler"]
         for key in list_ui_using_setcurrenttext:
             if key in data_dict:
-                dict_ui[key].setCurrentText(str(data_dict[key]))
+                ui_dict[key].setCurrentText(str(data_dict[key]))
             else:
                 print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
+        # 혹시 몰라 model ui 세팅을 매뉴얼로 호출해줌.
+        if "model" in data_dict:
+            self.on_model_changed(data_dict["model"])
+
+        # EditText : setText
         list_ui_using_settext = ["prompt", "negative_prompt", "width", "height",
                                  "steps", "seed", "scale", "cfg_rescale"]
         for key in list_ui_using_settext:
             if key in data_dict:
-                dict_ui[key].setText(str(data_dict[key]))
+                ui_dict[key].setText(str(data_dict[key]))
             else:
                 print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
-        list_ui_using_setchecked = ["sm", "sm_dyn"]
+        # Check : setChecked
+        list_ui_using_setchecked = ["sm", "sm_dyn", "use_coords", "variety_plus"]
         for key in list_ui_using_setchecked:
             if key in data_dict:
-                dict_ui[key].setChecked(strtobool(data_dict[key]))
+                ui_dict[key].setChecked(strtobool(data_dict[key]))
             else:
                 print("[set_data] 없는 키가 있습니다. 키 : ",key)
 
-    def load_data(self):
-        data_dict = {}
-        for key in TARGET_PARAMETERS:
-            data_dict[key] = str(self.settings.value(key, TARGET_PARAMETERS[key]))
+        # char : characterPrompts 얻어오기
+        characterPrompts = None
+        is_forced_use_coords = None
+        if "characterPrompts" in data_dict and data_dict["characterPrompts"]:
+            characterPrompts = data_dict["characterPrompts"]
 
-        self.set_data(data_dict)
+            #str이면 json으로 변경해보려는 노력을 한다. (load도 이리로옴)
+            if isinstance(characterPrompts, str):
+                try:
+                    characterPrompts = json.loads(characterPrompts)
+                except Exception:
+                    characterPrompts = None
+        elif "v4_prompt" in data_dict and data_dict["v4_prompt"] and "v4_negative_prompt" in data_dict and data_dict["v4_negative_prompt"]:
+            # 이미지에서 불러온 경우, characterPrompts, use_coords가 없고 v4_prompt만 있는 경우가 있다.
+
+            # 여기서 컨버트하여 적용함.
+            characterPrompts, use_coords = get_character_prompts_from_v4_prompt(data_dict)
+
+            if characterPrompts is not None:
+                # v4가 제대로 전환된경우 이미지에 model 지정이 없었다면 자동으로 v4 모델로 전환한다.
+                if "model" not in data_dict:
+                    ui_dict["model"].setCurrentText(DEFAULT_MODEL_V4)
+                    self.on_model_changed(MODEL_NAME_DICT[DEFAULT_MODEL_V4])
+
+            if use_coords is not None:
+                is_forced_use_coords = use_coords
+
+        # char : 최종 적용
+        if characterPrompts:
+            ui_dict["characterPrompts"].set_data(characterPrompts)
+        else:
+            ui_dict["characterPrompts"].clear_characters()
+
+        # char : use_coords를 set_data 보다 뒤에서 적용해야함
+        if is_forced_use_coords is not None:
+            print("is_forced_use_coords", is_forced_use_coords)
+            ui_dict["use_coords"].setChecked(is_forced_use_coords)
+        
 
     def check_folders(self):
         for key, default_path in DEFAULT_PATH.items():
@@ -167,40 +224,31 @@ class NAIAutoGeneratorWindow(QMainWindow):
             create_folder_if_not_exists(path)
 
     # 저장 대상인 항목만 이곳에 담는다.
-    def get_data_from_savetarget_ui(self, do_convert_type=False):
+    def get_data_from_savetarget_ui(self):
         data = {
             "model": self.dict_ui_settings["model"].currentText(),
             "prompt": self.dict_ui_settings["prompt"].toPlainText(),
             "negative_prompt": self.dict_ui_settings["negative_prompt"].toPlainText(),
-            "width": self.dict_ui_settings["width"].text(),
-            "height": self.dict_ui_settings["height"].text(),
+            "width": int(self.dict_ui_settings["width"].text()),
+            "height": int(self.dict_ui_settings["height"].text()),
             "sampler": self.dict_ui_settings["sampler"].currentText(),
-            "steps": self.dict_ui_settings["steps"].text(),
-            "seed": self.dict_ui_settings["seed"].text(),
-            "scale": self.dict_ui_settings["scale"].text(),
-            "cfg_rescale": self.dict_ui_settings["cfg_rescale"].text(),
-            "sm": str(self.dict_ui_settings["sm"].isChecked()),
-            "sm_dyn": str(self.dict_ui_settings["sm_dyn"].isChecked()),
-            "variety_plus": str(self.dict_ui_settings["variety_plus"].isChecked()),
+            "steps": int(self.dict_ui_settings["steps"].text()),
+            "seed": int(self.dict_ui_settings["seed"].text()),
+            "scale": float(self.dict_ui_settings["scale"].text()),
+            "cfg_rescale": float(self.dict_ui_settings["cfg_rescale"].text()),
+            "sm": self.dict_ui_settings["sm"].isChecked(),
+            "sm_dyn": self.dict_ui_settings["sm_dyn"].isChecked(),
+            "variety_plus": self.dict_ui_settings["variety_plus"].isChecked(),
+            "use_coords": self.dict_ui_settings["use_coords"].isChecked(),
+            "characterPrompts": self.dict_ui_settings["characterPrompts"].get_data()
         }
-
-        if do_convert_type:
-            data["width"] = int(data["width"])
-            data["height"] = int(data["height"])
-            data["steps"] = int(data["steps"])
-            data["seed"] = int(data["seed"] or 0)
-            data["scale"] = float(data["scale"])
-            data["cfg_rescale"] = float(data["cfg_rescale"])
-            data["sm"] = strtobool(data["sm"])
-            data["sm_dyn"] = strtobool(data["sm_dyn"])
-            data["variety_plus"] = strtobool(data["variety_plus"])
 
         return data
 
     # Warning! Don't interact with pyqt gui in this function
     # ui에서 데이터를 가져온 다음에 생성전 수정을 가한다.
     def _get_data_for_generate(self):
-        data = self.get_data_from_savetarget_ui(True)
+        data = self.get_data_from_savetarget_ui()
         self.save_data()
 
         # data precheck
@@ -256,6 +304,9 @@ class NAIAutoGeneratorWindow(QMainWindow):
 
         if prevText in targetItems:
             sampler_ui.setCurrentText(prevText)
+
+        # char off
+        self.character_prompts_container.setVisible(isV4)
         
         # vibe off
         self.vibe_settings_group.setVisible(not isV4)
@@ -281,7 +332,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
         self.dict_ui_settings["seed"].setText(str(data["seed"]))
 
         # result text
-        self.prompt_layout.set_result_text(data)
+        self.prompt_result.setText(prettify_naidict(data))
 
     def on_click_generate_once(self):
         self.list_settings_batch_target = []

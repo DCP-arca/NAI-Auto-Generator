@@ -104,7 +104,7 @@ class GenerateButtonsLayout():
 
         stylesheet = """
             color:black;
-            background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
+            background-color: """ + COLOR.BUTTON_SELECTED + """;
         """ if is_autogenrate else ""
         self.button_generate_auto.setStyleSheet(stylesheet)
         self.button_generate_auto.setText(

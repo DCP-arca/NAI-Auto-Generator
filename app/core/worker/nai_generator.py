@@ -3,9 +3,7 @@ import argon2
 from base64 import urlsafe_b64encode
 import requests
 import json
-import io
-import zipfile
-from PIL import Image
+import copy
 
 BASE_URL_MAIN = "https://api.novelai.net"
 BASE_URL_IMAGE = "https://image.novelai.net/ai/generate-image"
@@ -16,6 +14,8 @@ MODEL_NAME_DICT = {
     "NAI Diffusion V4 Full": "nai-diffusion-4-full",
     "NAI Diffusion V4 Curated": "nai-diffusion-4-curated-preview"
 }
+
+DEFAULT_MODEL_V4 = "NAI Diffusion V4 Full"
 
 MODEL_NAME_INPANT_DIC = {
     "nai-diffusion-3": "nai-diffusion-3-inpainting",
@@ -196,10 +196,10 @@ def _complete_v4_parameters(parameters):
     # both -> char_captions
     for target in ["v4_prompt", "v4_negative_prompt"]:
         for char_dict in parameters["characterPrompts"]:
-            new_char_dict = DEFAULT_PARAMETER_CHARCAPTIONS.copy()
-            new_char_dict["char_captions"] = char_dict["prompt"] if target == "v4_prompt" else char_dict["uc"]
+            new_char_dict = copy.deepcopy(DEFAULT_PARAMETER_CHARCAPTIONS)
+            new_char_dict["char_caption"] = char_dict["prompt"] if target == "v4_prompt" else char_dict["uc"]
             new_char_dict["centers"][0]["x"] = char_dict["center"]["x"]
-            new_char_dict["centers"][0]["y"] = char_dict["center"]["x"]
+            new_char_dict["centers"][0]["y"] = char_dict["center"]["y"]
 
             parent = parameters[target]["caption"]["char_captions"]
             parent.append(new_char_dict)
@@ -213,6 +213,32 @@ def _complete_v4_parameters(parameters):
     del parameters["sm"]
     del parameters["sm_dyn"]
     del parameters["variety_plus"]
+
+def get_character_prompts_from_v4_prompt(parameters):
+    characterPrompts, use_coords = None, None
+
+    if "v4_prompt" in parameters and parameters["v4_prompt"] and "v4_negative_prompt" in parameters and parameters["v4_negative_prompt"]:
+
+        # use_coords
+        if "use_coords" in parameters["v4_prompt"] and parameters["v4_prompt"]["use_coords"] is not None:
+            use_coords = parameters["v4_prompt"]["use_coords"]
+
+        # characterPrompts 만들기
+        try:
+            # 갯수만큼 빈껍데기 만들기
+            characterPrompts = [copy.deepcopy(DEFAULT_PARAMETER_CHARPROMPTS) for _ in parameters["v4_prompt"]["caption"]["char_captions"]]
+            # 내용 채우기
+            for target in ["v4_prompt", "v4_negative_prompt"]:
+                for i, char_dict in enumerate(parameters[target]["caption"]["char_captions"]):
+                    characterPrompts[i]["prompt" if target=="v4_prompt" else "uc"] = char_dict["char_caption"]
+                    characterPrompts[i]["center"] = {
+                        "x":char_dict["centers"][0]["x"],
+                        "y":char_dict["centers"][0]["y"]
+                    }
+        except Exception:
+            characterPrompts = None
+
+    return characterPrompts, use_coords
 
 def is_now_model_v4(model_key):
     if model_key == "NAI Diffusion V4 Full" or model_key == "NAI Diffusion V4 Curated" or model_key == "nai-diffusion-4-full" or model_key == "nai-diffusion-4-curated-preview":
@@ -288,9 +314,9 @@ class NAIGenerator():
 
         # parameter 생성
         if isV4:
-            parameters = V4_PARAMETERS.copy()
+            parameters = copy.deepcopy(V4_PARAMETERS)
         else:
-            parameters = V3_PARAMETERS.copy()
+            parameters = copy.deepcopy(V3_PARAMETERS)
         parameters.update(self.parameters)
 
         # extraseed 통일

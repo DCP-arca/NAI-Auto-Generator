@@ -5,9 +5,13 @@ from config.paths import PATH_CSV_TAG_COMPLETION
 
 def _on_load_completiontag_success(window, tag_list):
     if tag_list:
+        window.completiontag_list = tag_list
+
         target_code = ["prompt", "negative_prompt"]
         for code in target_code:
             window.dict_ui_settings[code].start_complete_mode(tag_list)
+
+        window.dict_ui_settings["characterPrompts"].refresh_completiontag_list()
 
 class CompletionTagLoadThread(QThread):
     on_load_completiontag_success = pyqtSignal(QMainWindow, list)

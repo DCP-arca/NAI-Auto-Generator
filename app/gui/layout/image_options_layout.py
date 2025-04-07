@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QGroupBox, QFrame, QFileDialog,QLabel,QScrollArea, QVBoxLayout, QHBoxLayout, QPushButton, QDialog
-from PyQt5.QtGui import QPixmap, QImage, QPainter
+from PyQt5.QtWidgets import QWidget, QGroupBox, QFrame, QFileDialog,QScrollArea, QVBoxLayout, QHBoxLayout, QPushButton, QDialog, QSizePolicy
+from PyQt5.QtGui import QImage, QPainter
 from PyQt5.QtCore import Qt, QSize, QRectF, QEvent
 
 from gui.widget.custom_slider_widget import CustomSliderWidget
@@ -14,7 +14,8 @@ from config.themes import COLOR
 
 PADDING_IMAGE_ITEM = 15
 HEIGHT_IMAGE_ITEM = 150
-MAXHEIGHT_IMAGE_ITEM = 250
+MINHEIGHT_IMAGE_ITEM = 180
+MAXHEIGHT_IMAGE_ITEM = 350
 
 VIBE_SLIDER_OPTION1 = {
     "title": "Information Extracted:",
@@ -168,7 +169,7 @@ class ImageItem(QWidget):
     def change_image(self, qimage, is_mask_applied):
         if is_mask_applied:
             self.inpaint_button.setStyleSheet("""
-                    background-color: """ + COLOR.BUTTON_AUTOGENERATE + """;
+                    background-color: """ + COLOR.BUTTON_SELECTED + """;
                     background-position: center;
                     color: white;
                 """)
@@ -237,7 +238,6 @@ class ImageLayout(QWidget):
         groupbox = QGroupBox(title)
         main_layout.addWidget(groupbox)
         grouplayout = QVBoxLayout(groupbox)
-
         main_layout.setContentsMargins(0,0,0,0)
 
         self.scroll_area = QScrollArea()
@@ -294,13 +294,15 @@ class ImageLayout(QWidget):
         self.update_container_height()
 
     def update_container_height(self):
-        # """컨테이너 높이 계산 (최대 700)
-        #    계산: height = PADDING_IMAGE_ITEM (top padding) + (count * HEIGHT_IMAGE_ITEM) + ((count+1)*PADDING_IMAGE_ITEM)
-        #    예) 0개: PADDING_IMAGE_ITEM, 1개: PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM, 2개: PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM+HEIGHT_IMAGE_ITEM+PADDING_IMAGE_ITEM, ... 최대 700
-        # """
-        # calc_height = PADDING_IMAGE_ITEM + count * HEIGHT_IMAGE_ITEM + (count + 1) * PADDING_IMAGE_ITEM
+        # 스크롤 레이아웃에 추가된 위젯 개수를 구함 (ImageItem과 ButtonsWidget 포함)
         count = self.scroll_layout.count()
-        self.scroll_area.setFixedHeight(180 if count <= 1 else MAXHEIGHT_IMAGE_ITEM)
+        # 계산: 총 높이 = (개수 * (이미지 아이템 높이 + 패딩)) + 상단 패딩
+        calc_height = count * (HEIGHT_IMAGE_ITEM + PADDING_IMAGE_ITEM) + PADDING_IMAGE_ITEM
+        # 최소 최대 높이 지정
+        calc_height = max(calc_height, MINHEIGHT_IMAGE_ITEM)
+        calc_height = min(calc_height, MAXHEIGHT_IMAGE_ITEM)
+        # 컨테이너의 최소 높이와 스크롤 영역의 고정 높이를 설정함
+        self.scroll_area.setFixedHeight(calc_height)
 
     def on_click_remove_button(self):
         if self.is_i2i:
@@ -364,7 +366,7 @@ def init_image_options_layout(self):
     image_options_layout.addWidget(i2i_settings_group )
 
     vibe_settings_group = ImageLayout(self, title="Vibe Settings", is_i2i=False)
-    image_options_layout.addWidget(vibe_settings_group )
+    image_options_layout.addWidget(vibe_settings_group)
 
     image_options_layout.addStretch()
 

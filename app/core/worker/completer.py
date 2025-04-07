@@ -38,6 +38,8 @@ class CustomCompleter(QCompleter):
 class CompletionTextEdit(QTextEdit):
     def __init__(self):
         super().__init__()
+        self.setAcceptRichText(False)
+        self.setAcceptDrops(False)
         self.completer = None
         self.textChanged.connect(self.highlightBrackets)
     def highlightBrackets(self):

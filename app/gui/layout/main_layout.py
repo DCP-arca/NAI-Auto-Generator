@@ -6,15 +6,12 @@ from gui.layout.resolution_options_layout import init_resolution_options_layout
 from gui.layout.parameter_options_layout import init_parameter_options_layout
 from gui.layout.generate_buttons_layout import GenerateButtonsLayout
 from gui.layout.prompt_layout import PromptLayout
+from gui.layout.image_options_layout import init_image_options_layout
+from gui.layout.expand_layout import init_expand_layout
 
-from gui.widget.result_image_view import ResultImageView
-
-from config.paths import PATH_IMG_NO_IMAGE
 from config.themes import MAIN_STYLESHEET
 
 from util.ui_util import create_empty, add_button
-
-from gui.layout.image_options_layout import init_image_options_layout
 
 
 def init_main_layout(self):
@@ -74,25 +71,15 @@ def init_main_layout(self):
 
     widget_right = QWidget()
     main_splitter.addWidget(widget_right)
-    vbox_expand = QVBoxLayout()
-    vbox_expand.setContentsMargins(30, 30, 30, 30)
+    vbox_expand = init_expand_layout(self)
     widget_right.setLayout(vbox_expand)
-
-    image_result = ResultImageView(PATH_IMG_NO_IMAGE)
-    image_result.setStyleSheet("""
-        background-color: white;
-        background-position: center
-    """)
-    self.installEventFilter(image_result)
-    self.image_result = image_result
-    vbox_expand.addWidget(image_result)
 
     # main_splitter.setCollapsible(0, False)
     main_splitter.widget(1).setMaximumSize(0, 0)
 
     def on_splitter_move(pos, index):
         if self.is_expand:
-            image_result.refresh_size()
+            self.image_result.refresh_size()
             if pos > self.size().width() * 0.9:
                 self.on_click_expand()
                 self.settings.setValue("splitterSizes", None)

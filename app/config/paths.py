@@ -22,8 +22,6 @@ PATH_IMG_ICON_GETTER = resource_path("assets/icon_getter.png")
 PATH_IMG_ICON_TAGGER = resource_path("assets/icon_tagger.png")
 PATH_CSV_TAG_COMPLETION = resource_path("assets/danbooru_tags_post_count.csv")
 
-print(PATH_IMG_NO_IMAGE)
-
 DEFAULT_PATH = {
     "path_results": "results/",
     "path_wildcards": "wildcards/",

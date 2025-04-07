@@ -21,3 +21,22 @@ def strtobool(val):
 
 def get_key_from_dict(dictionary, value):
     return next((key for key, val in dictionary.items() if val == value), None)
+
+
+def try_loads(json_str):
+    try:
+        json_str = json.loads(json_str)
+    except Exception:
+        json_str = None
+
+    return json_str
+
+
+def try_dumps(target):
+    try:
+        result = json.dumps(target)
+    except Exception:
+        result = None
+
+    return result
+    

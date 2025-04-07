@@ -67,7 +67,7 @@ def show_setting_save_dialog(self):
         self, "세팅 파일을 저장할 곳을 선택해주세요", path, "Txt File (*.txt)")
     if path:
         try:
-            json_str = json.dumps(self.get_data_from_savetarget_ui(True))
+            json_str = json.dumps(self.get_data_from_savetarget_ui())
             with open(path, "w", encoding="utf8") as f:
                 f.write(json_str)
         except Exception as e:

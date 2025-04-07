@@ -1,14 +1,16 @@
 
-from PyQt5.QtWidgets import QTextEdit, QLabel, QVBoxLayout, QHBoxLayout
+from PyQt5.QtWidgets import QTextEdit, QLabel, QVBoxLayout, QHBoxLayout, QSizePolicy
 
 from core.worker.completer import CompletionTextEdit
 
 from util.ui_util import create_empty
 from util.string_util import prettify_naidict
 
+from gui.layout.character_prompt_layout import CharacterPromptsContainer
+
 from config.strings import STRING
 
-def create_prompt_layout(self, title_text, list_buttoncode):
+def create_prompt_layout(self, title_text):
     hbox_prompt_title = QHBoxLayout()
 
     label = QLabel(title_text)
@@ -16,11 +18,11 @@ def create_prompt_layout(self, title_text, list_buttoncode):
 
     return hbox_prompt_title
 
-def create_prompt_edit(self, placeholder_text, code):
+def create_prompt_edit(self, placeholder_text, code, minimum_height):
     textedit = CompletionTextEdit()
     textedit.setPlaceholderText(placeholder_text)
-    textedit.setAcceptRichText(False)
-    textedit.setAcceptDrops(False)
+    textedit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+    textedit.setMinimumHeight(minimum_height)
     self.dict_ui_settings[code] = textedit
 
     return textedit
@@ -35,34 +37,25 @@ class PromptLayout():
 
         vbox = QVBoxLayout()
 
-        vbox.addLayout(create_prompt_layout(self, STRING.LABEL_PROMPT, ["add", "set", "sav"]))
+        vbox.addLayout(create_prompt_layout(self, STRING.LABEL_PROMPT))
 
-        vbox.addWidget(create_prompt_edit(
-            parent, STRING.LABEL_PROMPT_HINT, "prompt"), stretch=20)
+        vbox.addWidget(create_prompt_edit(parent, STRING.LABEL_PROMPT_HINT, "prompt",
+                                          minimum_height=200), stretch=3)
 
-        vbox.addWidget(create_empty(minimum_height=6))
+        vbox.addWidget(create_empty(minimum_height=4))
 
         vbox.addLayout(create_prompt_layout(
-            parent, STRING.LABEL_NPROMPT, ["nadd", "nset", "nsav"]))
+            parent, STRING.LABEL_NPROMPT))
 
         vbox.addWidget(create_prompt_edit(
-            parent, STRING.LABEL_NPROMPT_HINT, "negative_prompt"), stretch=10)
+            parent, STRING.LABEL_NPROMPT_HINT, "negative_prompt",
+                                          minimum_height=100), stretch=2)
 
-        vbox.addWidget(create_empty(minimum_height=6))
+        vbox.addWidget(create_empty(minimum_height=4))
 
-        vbox.addWidget(QLabel("결과창"))
-        prompt_result = QTextEdit("")
-        prompt_result.setPlaceholderText("이곳에 결과가 출력됩니다.")
-        prompt_result.setReadOnly(True)
-        prompt_result.setAcceptRichText(False)
-        prompt_result.setAcceptDrops(False)
-        vbox.addWidget(prompt_result, stretch=5)
+        parent.character_prompts_container = CharacterPromptsContainer(parent)
+        vbox.addWidget(parent.character_prompts_container, stretch=1)
 
-        self.prompt_result = prompt_result
+        vbox.addWidget(create_empty(minimum_height=4))
 
         return vbox
-
-    def set_result_text(self, nai_dict):
-        content = prettify_naidict(nai_dict)
-
-        self.prompt_result.setText(content)
