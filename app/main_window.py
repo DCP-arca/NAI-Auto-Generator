@@ -254,8 +254,16 @@ class NAIAutoGeneratorWindow(QMainWindow):
         # data precheck
         self.check_folders()
         data["prompt"] = apply_wc_and_lessthan(self.wcapplier, data["prompt"])
-        data["negative_prompt"] = apply_wc_and_lessthan(
-            self.wcapplier, data["negative_prompt"])
+        data["negative_prompt"] = apply_wc_and_lessthan(self.wcapplier, data["negative_prompt"])
+        
+        if "characterPrompts" in data and data["characterPrompts"]:
+            for char_dict in data["characterPrompts"]:
+                if "prompt" in char_dict and char_dict["prompt"]:
+                    char_dict["prompt"] = apply_wc_and_lessthan(self.wcapplier, char_dict["prompt"])
+                if "uc" in char_dict and char_dict["uc"]:
+                    char_dict["uc"] = apply_wc_and_lessthan(self.wcapplier, char_dict["uc"])
+
+        print(data)
 
         # seed pick
         if not self.dict_ui_settings["seed_fix_checkbox"].isChecked() or data["seed"] == -1:
