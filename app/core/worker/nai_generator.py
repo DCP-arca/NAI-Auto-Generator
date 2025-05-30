@@ -154,6 +154,55 @@ V4_PARAMETERS = {
     "prefer_brownian": True
 }
 
+V4_5_PARAMETERS = {
+    "params_version": 3,
+    "width": 832,
+    "height": 1216,
+    "scale": 5,
+    "sampler": "k_euler",
+    "steps": 28,
+    "n_samples": 1,
+    "ucPreset": 2,
+    "qualityToggle": True,
+    "autoSmea": False,
+    "dynamic_thresholding": False,
+    "controlnet_strength": 1,
+    "legacy": False,
+    "add_original_image": True,
+    "cfg_rescale": 0.4,
+    "noise_schedule": "karras",
+    "legacy_v3_extend": False,
+    "skip_cfg_above_sigma": None,
+    "use_coords": True,
+    "legacy_uc": False,
+    "normalize_reference_strength_multiple": True,
+    "inpaintImg2ImgStrength": 1,
+    "v4_prompt":
+    {
+        "caption":
+        {
+            "base_caption": "1girl, 1boy,\n\n1.1::aritst:kiira::, artist:gachigachi, 0.7::artist:tianliang duohe fangdongye::, 1.1::artist:odayaka::, year 2025, year 2024, nsfw, dynamic lighting,\n\nloli, flat chest, smooth skin, skinny,\n\nnude, spread legs, pussy, penis, vaginal sex, deep penetration, beds, bedding, rape, crying, cum inside, {{female orgasm}}, trembling girl, heart-shaped pupils, blush, twitching womb,\n\ncovering own mouth, grab legs,\n\nblack long hair,, no text, best quality, very aesthetic, absurdres",
+            "char_captions":
+            []
+        },
+        "use_coords": True,
+        "use_order": True
+    },
+    "v4_negative_prompt":
+    {
+        "caption":
+        {
+            "base_caption": "ribs, angry",
+            "char_captions":
+            []
+        },
+        "legacy_uc": False
+    },
+    "characterPrompts":
+    [],
+    "negative_prompt": "ribs, angry"
+}
+
 # 모델의 정보를 저장함
 # key는 모델 이름으로, 드롭다운에 노출됨
 # value에 저장된 bool 값이 UI 노출 여부를 결정함. main_window.on_model_changed 참고.
@@ -211,7 +260,7 @@ MODEL_INFO_DICT = {
         "variety_plus": False,
         "characterPrompts": True,
         "sampler": SAMPLER_ITEMS_V4,
-        "default_parameters": V4_PARAMETERS,
+        "default_parameters": V4_5_PARAMETERS,
         "need_call_complete_function": True
     },
     "NAI Diffusion V4.5 Curated": {
@@ -224,7 +273,7 @@ MODEL_INFO_DICT = {
         "variety_plus": False,
         "characterPrompts": True,
         "sampler": SAMPLER_ITEMS_V4,
-        "default_parameters": V4_PARAMETERS,
+        "default_parameters": V4_5_PARAMETERS,
         "need_call_complete_function": True
     }
 }

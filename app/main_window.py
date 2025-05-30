@@ -300,7 +300,14 @@ class NAIAutoGeneratorWindow(QMainWindow):
         return data
         
     def on_model_changed(self, text):
-        model_info = MODEL_INFO_DICT[text]
+        if text in MODEL_INFO_DICT:
+            model_info = MODEL_INFO_DICT[text]
+        elif text in [info["model"] for info in MODEL_INFO_DICT.values()]:
+            model_info = next((info for info in MODEL_INFO_DICT.values() if info["model"] == text), None)
+            if not model_info:
+                model_info = MODEL_INFO_DICT[DEFAULT_MODEL_V4]
+                self.dict_ui_settings["model"].setCurrentText(DEFAULT_MODEL_V4)
+                QMessageBox.information(self, '경고', "모델 정보를 찾을 수 없습니다. 기본 모델로 설정합니다.")
 
         # sampler
         sampler_ui = self.dict_ui_settings["sampler"]
