@@ -32,7 +32,7 @@ from util.file_util import create_folder_if_not_exists
 from util.ui_util import set_opacity
 
 from core.worker.naiinfo_getter import get_naidict_from_file, get_naidict_from_txt, get_naidict_from_img
-from core.worker.nai_generator import NAIGenerator, is_now_model_v4, get_character_prompts_from_v4_prompt, TARGET_PARAMETERS, SAMPLER_ITEMS_V4, SAMPLER_ITEMS_V3, MODEL_NAME_DICT, DEFAULT_MODEL_V4
+from core.worker.nai_generator import NAIGenerator, get_character_prompts_from_v4_prompt, TARGET_PARAMETERS, SAMPLER_ITEMS_V4, SAMPLER_ITEMS_V3, MODEL_INFO_DICT, DEFAULT_MODEL_V4
 from core.worker.wildcard_applier import WildcardApplier
 from core.worker.danbooru_tagger import DanbooruTagger
 
@@ -201,7 +201,7 @@ class NAIAutoGeneratorWindow(QMainWindow):
                 # v4가 제대로 전환된경우 이미지에 model 지정이 없었다면 자동으로 v4 모델로 전환한다.
                 if "model" not in data_dict:
                     ui_dict["model"].setCurrentText(DEFAULT_MODEL_V4)
-                    self.on_model_changed(MODEL_NAME_DICT[DEFAULT_MODEL_V4])
+                    self.on_model_changed(MODEL_INFO_DICT[DEFAULT_MODEL_V4]["model"])
 
             if use_coords is not None:
                 is_forced_use_coords = use_coords
@@ -300,30 +300,32 @@ class NAIAutoGeneratorWindow(QMainWindow):
         return data
         
     def on_model_changed(self, text):
-        isV4 = is_now_model_v4(text)
+        model_info = MODEL_INFO_DICT[text]
 
         # sampler
         sampler_ui = self.dict_ui_settings["sampler"]
-        prevText = sampler_ui.currentText()
+        sampler_prevText = sampler_ui.currentText()
 
         sampler_ui.clear()
-        targetItems = SAMPLER_ITEMS_V4 if isV4 else SAMPLER_ITEMS_V3
+        targetItems = model_info["sampler"]
         sampler_ui.addItems(targetItems)
 
-        if prevText in targetItems:
-            sampler_ui.setCurrentText(prevText)
+        if sampler_prevText in targetItems:
+            sampler_ui.setCurrentText(sampler_prevText)
 
         # char off
-        self.character_prompts_container.setVisible(isV4)
+        self.character_prompts_container.setVisible(model_info["characterPrompts"])
+        
+        # i2i off
+        self.i2i_settings_group.setVisible(model_info["i2i"])
         
         # vibe off
-        self.vibe_settings_group.setVisible(not isV4)
+        self.vibe_settings_group.setVisible(model_info["vibe"])
 
         # settings off
-        opacity = 0 if isV4 else 1
-        set_opacity(self.dict_ui_settings["sm"], opacity)
-        set_opacity(self.dict_ui_settings["sm_dyn"], opacity)
-        set_opacity(self.dict_ui_settings["variety_plus"], opacity)
+        set_opacity(self.dict_ui_settings["sm"], model_info["sm"])
+        set_opacity(self.dict_ui_settings["sm_dyn"], model_info["sm_dyn"])
+        set_opacity(self.dict_ui_settings["variety_plus"], model_info["variety_plus"])
 
     def _on_after_create_data_apply_gui(self):
         data = self.nai.parameters

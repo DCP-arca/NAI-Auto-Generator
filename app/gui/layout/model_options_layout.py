@@ -1,6 +1,6 @@
 from PyQt5.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QHBoxLayout, QComboBox
 
-from core.worker.nai_generator import MODEL_NAME_DICT
+from core.worker.nai_generator import MODEL_INFO_DICT
 
 
 def init_model_options_layout(self):
@@ -15,7 +15,7 @@ def init_model_options_layout(self):
     model_options_layout.addWidget(QLabel("모델: "))
     
     model_combo = QComboBox()
-    model_combo.addItems(MODEL_NAME_DICT.keys())
+    model_combo.addItems(MODEL_INFO_DICT.keys())
     model_combo.currentTextChanged.connect(self.on_model_changed)
     model_options_layout.addWidget(model_combo, stretch=2)
     

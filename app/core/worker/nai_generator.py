@@ -5,23 +5,18 @@ import requests
 import json
 import copy
 
+
+#
+#
+#
+#
+#
+
 BASE_URL_MAIN = "https://api.novelai.net"
 BASE_URL_IMAGE = "https://image.novelai.net/ai/generate-image"
 
 
-MODEL_NAME_DICT = {
-    "NAI Diffusion Anime V3": "nai-diffusion-3",
-    "NAI Diffusion V4 Full": "nai-diffusion-4-full",
-    "NAI Diffusion V4 Curated": "nai-diffusion-4-curated-preview"
-}
-
-DEFAULT_MODEL_V4 = "NAI Diffusion V4 Full"
-
-MODEL_NAME_INPANT_DIC = {
-    "nai-diffusion-3": "nai-diffusion-3-inpainting",
-    "nai-diffusion-4-curated-preview": "nai-diffusion-4-curated-inpainting",
-    "nai-diffusion-4-full": "nai-diffusion-4-full-inpainting"
-}
+DEFAULT_MODEL_V4 = "NAI Diffusion V4.5 Full"
 
 SAMPLER_ITEMS_V3 = ['k_euler', 'k_euler_ancestral', 'k_dpmpp_2s_ancestral', "k_dpmpp_2m_sde", 
 				 "k_dpmpp_2m", 'k_dpmpp_sde', "ddim_v3"]
@@ -56,7 +51,6 @@ TARGET_PARAMETERS = {
     "use_coords": False,
     "characterPrompts": []  # DEFAULT_PARAMETER_CHARPROMPTS를 생성해서 넣어야함.
 }
-
 
 DEFAULT_PARAMETER_CHARPROMPTS = {
     "prompt": "girl, ",
@@ -160,6 +154,84 @@ V4_PARAMETERS = {
     "prefer_brownian": True
 }
 
+# 모델의 정보를 저장함
+# key는 모델 이름으로, 드롭다운에 노출됨
+# value에 저장된 bool 값이 UI 노출 여부를 결정함. main_window.on_model_changed 참고.
+# @need_call_complete_function 값이 True인 경우, _complete_v4_parameters 함수가 호출됨. 
+MODEL_INFO_DICT = {
+    "NAI Diffusion Anime V3": {
+        "model": "nai-diffusion-3",
+        "i2i": True,
+        "inpaint": True,
+        "vibe": True,
+        "sm": True,
+        "sm_dyn": True,
+        "variety_plus": True,
+        "characterPrompts": False,
+        "sampler": SAMPLER_ITEMS_V3,
+        "inpainting_model": "nai-diffusion-3-inpainting",
+        "default_parameters": V3_PARAMETERS,
+        "need_call_complete_function": False
+    },
+    "NAI Diffusion V4 Full": {
+        "model": "nai-diffusion-4-full",
+        "i2i": True,
+        "inpaint": True,
+        "vibe": True,
+        "sm": False,
+        "sm_dyn": False,
+        "variety_plus": False,
+        "characterPrompts": True,
+        "sampler": SAMPLER_ITEMS_V4,
+        "inpainting_model": "nai-diffusion-4-full-inpainting",
+        "default_parameters": V4_PARAMETERS,
+        "need_call_complete_function": True
+    },
+    "NAI Diffusion V4 Curated": {
+        "model": "nai-diffusion-4-curated-preview",
+        "i2i": True,
+        "inpaint": True,
+        "vibe": True,
+        "sm": False,
+        "sm_dyn": False,
+        "variety_plus": False,
+        "characterPrompts": True,
+        "sampler": SAMPLER_ITEMS_V4,
+        "inpainting_model": "nai-diffusion-4-curated-inpainting",
+        "default_parameters": V4_PARAMETERS,
+        "need_call_complete_function": True
+    },
+    "NAI Diffusion V4.5 Full": {
+        "model": "nai-diffusion-4-5-full",
+        "i2i": False,
+        "inpaint": False,
+        "vibe": False,
+        "sm": False,
+        "sm_dyn": False,
+        "variety_plus": False,
+        "characterPrompts": True,
+        "sampler": SAMPLER_ITEMS_V4,
+        "default_parameters": V4_PARAMETERS,
+        "need_call_complete_function": True
+    },
+    "NAI Diffusion V4.5 Curated": {
+        "model": "nai-diffusion-4-5-curated",
+        "i2i": False,
+        "inpaint": False,
+        "vibe": False,
+        "sm": False,
+        "sm_dyn": False,
+        "variety_plus": False,
+        "characterPrompts": True,
+        "sampler": SAMPLER_ITEMS_V4,
+        "default_parameters": V4_PARAMETERS,
+        "need_call_complete_function": True
+    }
+}
+
+# 모든 테이블에 필요한 옵션이 있는지 확인
+assert all(all(key in model_info for key in ["model", "i2i", "inpaint", "vibe", "sm", "sm_dyn", "variety_plus", "characterPrompts", "sampler", "default_parameters", "need_call_complete_function"]) for model_info in MODEL_INFO_DICT.values()), "모델에 필요한 옵션이 누락되었습니다"
+
 
 def argon_hash(email: str, password: str, size: int, domain: str) -> str:
     pre_salt = f"{password[:6]}{email}{domain}"
@@ -204,11 +276,6 @@ def _complete_v4_parameters(parameters):
             parent = parameters[target]["caption"]["char_captions"]
             parent.append(new_char_dict)
 
-    # 바이브도 제거함
-    parameters["reference_image_multiple"] = []
-    parameters["reference_information_extracted_multiple"]= []
-    parameters["reference_strength_multiple"]= []
-
     # 다음이 포함되어있으면 작동이 안됨.
     del parameters["sm"]
     del parameters["sm_dyn"]
@@ -240,11 +307,6 @@ def get_character_prompts_from_v4_prompt(parameters):
 
     return characterPrompts, use_coords
 
-def is_now_model_v4(model_key):
-    if model_key == "NAI Diffusion V4 Full" or model_key == "NAI Diffusion V4 Curated" or model_key == "nai-diffusion-4-full" or model_key == "nai-diffusion-4-curated-preview":
-        return True
-    else:
-        return False
 
 class NAIGenerator():
     def __init__(self):
@@ -299,10 +361,9 @@ class NAIGenerator():
         parameters = {}
 
         # model
-        model = self.parameters["model"]
-        if model in MODEL_NAME_DICT:
-            model = MODEL_NAME_DICT[model]
-        isV4 = is_now_model_v4(model)
+        model_name = self.parameters["model"]
+        model = MODEL_INFO_DICT[model_name]["model"]
+        model_info = MODEL_INFO_DICT[model_name]
 
         # action
         action = "generate"
@@ -310,13 +371,10 @@ class NAIGenerator():
             action = "img2img"
         if 'mask' in self.parameters and self.parameters['mask']:
             action = "infill"
-            model = MODEL_NAME_INPANT_DIC[model]
+            model = model_info["inpainting_model"]
 
         # parameter 생성
-        if isV4:
-            parameters = copy.deepcopy(V4_PARAMETERS)
-        else:
-            parameters = copy.deepcopy(V3_PARAMETERS)
+        parameters = copy.deepcopy(model_info["default_parameters"])
         parameters.update(self.parameters)
 
         # extraseed 통일
@@ -326,9 +384,15 @@ class NAIGenerator():
         if "image" in parameters or parameters['sampler'] == 'ddim_v3':
             parameters['sm'] = False
             parameters['sm_dyn'] = False
-
-        # v4는 추가 수정함.
-        if isV4:
+            
+        # vibe 아니면 관련 제거
+        if not model_info["vibe"]:
+            parameters["reference_image_multiple"] = []
+            parameters["reference_information_extracted_multiple"]= []
+            parameters["reference_strength_multiple"]= []
+            
+        # _complete_v4_parameters 함수가 호출됨. 
+        if model_info["need_call_complete_function"]:
             _complete_v4_parameters(parameters)
 
         try:
